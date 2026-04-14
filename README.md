@@ -28,6 +28,14 @@ export default defineConfig({
 
 It is now updated to match `v4` of the Tailwind plugin.
 
+**Latest internal additions:**
+- New `xs` size tier on every size-aware preset (slide, fade, focus, blur, pulse, wobble, seesaw, oscillate, stretch, float)
+- Arbitrary value JIT support: `motion-preset-slide-up-[10px]`, `motion-preset-fade-[1200ms]`, `motion-preset-pulse-[1.05]`, etc.
+- `wait`, `still`, `motion-paused`, `motion-running`, `pause`, `play` now apply `!important` so they reliably override animation state
+- `still` now zeroes durations to `0ms` (was `0.01ms`)
+- Bug fixes: corner slides (`motion-preset-slide-up-right` etc.) now actually animate diagonally; theme defaults wired to the correct UnoCSS keys; rule selectors interpolate `${selector}` so all UnoCSS variants (`hover:`, `focus:`, `md:`, `dark:`, `group-hover:` …) work everywhere
+- Removed dead autocomplete entries (`motion-preset-slide` bare, `motion-preset-flomoji-[...]` literal)
+
 
 ## Demo
 
@@ -239,17 +247,25 @@ motion-grayscale-loop-[0.875]/reset
 
 ##### Classics
 ```
+motion-preset-fade
+motion-preset-fade-(xs|sm|md|lg)
+motion-preset-fade-[<duration>]      // e.g. motion-preset-fade-[1200ms]
+
 motion-preset-slide-<right|left|up|down>
-motion-preset-slide-<right|left|up|down>-(sm|md|lg)
+motion-preset-slide-<right|left|up|down>-(xs|sm|md|lg)
+motion-preset-slide-<right|left|up|down>-[<value>]    // motion-preset-slide-up-[10px], -[3rem], -[2%]
 
 motion-preset-slide-<up-right|up-left|down-left|down-right>
-motion-preset-slide-<up-right|up-left|down-left|down-right>-(sm|md|lg)
+motion-preset-slide-<up-right|up-left|down-left|down-right>-(xs|sm|md|lg)
+motion-preset-slide-<up-right|up-left|down-left|down-right>-[<value>]
 
 motion-preset-focus
-motion-preset-focus-(sm|md|lg)
+motion-preset-focus-(xs|sm|md|lg)
+motion-preset-focus-[<blur>]         // e.g. motion-preset-focus-[2px]
 
 motion-preset-blur-<right|left|up|down>
-motion-preset-blur-<right|left|up|down>-(sm|md|lg)
+motion-preset-blur-<right|left|up|down>-(xs|sm|md|lg)
+motion-preset-blur-<right|left|up|down>-[<blur>]      // e.g. motion-preset-blur-up-[3px]
 
 motion-preset-rebound
 motion-preset-rebound-(right|left|up|down)
@@ -267,22 +283,27 @@ motion-preset-wiggle
 
 ```
 motion-preset-pulse
-motion-preset-pulse-(sm|md|lg)
+motion-preset-pulse-(xs|sm|md|lg)
+motion-preset-pulse-[<scale>]        // e.g. motion-preset-pulse-[1.05]
 
 motion-preset-wobble
-motion-preset-wobble-(sm|md|lg)
+motion-preset-wobble-(xs|sm|md|lg)
+motion-preset-wobble-[<value>]       // e.g. motion-preset-wobble-[20%]
 
 motion-preset-seesaw
-motion-preset-seesaw-(sm|md|lg)
+motion-preset-seesaw-(xs|sm|md|lg)
+motion-preset-seesaw-[<deg>]         // e.g. motion-preset-seesaw-[2deg]
 
 motion-preset-oscillate
-motion-preset-oscillate-(sm|md|lg)
+motion-preset-oscillate-(xs|sm|md|lg)
+motion-preset-oscillate-[<value>]    // e.g. motion-preset-oscillate-[20%]
 
 motion-preset-stretch
-motion-preset-stretch-(sm|md|lg)
+motion-preset-stretch-(xs|sm|md|lg)
 
 motion-preset-float
-motion-preset-float-(sm|md|lg)
+motion-preset-float-(xs|sm|md|lg)
+motion-preset-float-[<value>]        // e.g. motion-preset-float-[200%]
 
 motion-preset-spin
 
@@ -378,19 +399,22 @@ motion-running
 
 ### Smart Extras
 
-These are not part of the original library, see "What's Different" below for more info:
+These are not part of the original library, see "What's Different" below for more info. All apply with `!important` so they reliably override animation state regardless of source-order or specificity.
 
 ```css
-/* Short-hand pause */
+/* Short-hand pause (animation-play-state: paused) */
 .pause
 
-/* Short-hand paly */
+/* Short-hand play (animation-play-state: running) */
 .play
 
-/* Same as pause, but better name - meant to be used with JS to "remove this class" to trigger the animation */
+/* Same as pause, but better name — designed to be removed via JS or
+   IntersectionObserver when you want the animation to start. Cascades to
+   children + ::before/::after so the whole subtree freezes. */
 .wait
 
-/* Motion = 0, Completes the animations forcefully, this is technically different than pause */
+/* Motion = 0, completes (or kills) animations forcefully — different from pause.
+   Sets every duration and delay to 0ms !important and cascades to children. */
 .still
 ```
 
@@ -459,26 +483,57 @@ motion-preset-flomoji-[Woah!]
 
 ### Smart Classes
 
-These are extra short-hands. Note that still and pause (or motion-pause) are different.
+These are extra short-hands. Note that still and pause (or motion-paused) are different. Every utility below uses `!important` so it always wins.
 
 ```css
-.pause { animation-play-state: paused; }
-.play { animation-play-state: running; }
+.pause { animation-play-state: paused !important; }
+.play  { animation-play-state: running !important; }
 
-/* You'll need to manually remove "wait" with JS to use this helper when you want the animation to start */
-/* This is excellent for when triggering when in viewport */
-/* Note: wait also applies to ::before and ::after pseudo-attributes */
-.wait, .wait * { animation-play-state: paused; }
+/* You'll need to manually remove "wait" with JS when you want the animation to start.
+   This is excellent for triggering when in viewport.
+   Note: wait also applies to ::before, ::after, and all descendants. */
+.wait, .wait::before, .wait::after,
+.wait *, .wait *::before, .wait *::after {
+    animation-play-state: paused !important;
+}
 
-/* Note: still also applies to ::before and ::after pseudo-attributes */
-.still, .still * {
-    --motion-duration: 0.01ms !important;
+/* Note: still also applies to ::before, ::after, and all descendants. */
+.still, .still::before, .still::after,
+.still *, .still *::before, .still *::after {
+    --motion-duration: 0ms !important;
     --motion-delay: 0ms !important;
-    animation-duration: 0.01ms !important;
+    animation-duration: 0ms !important;
     animation-delay: 0ms !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0ms !important;
     transition-delay: 0ms !important;
 }
+```
+
+### Variants (`hover:`, `focus:`, `md:`, `dark:`, `group-hover:` …)
+
+You don't need to do anything special — every UnoCSS variant from `presetUno` / `presetWind4` works on every motion utility automatically. Examples:
+
+```html
+<!-- pseudo-classes -->
+<button class="hover:motion-preset-pulse-md">hover to pulse</button>
+<input class="focus:motion-preset-pulse-sm" />
+
+<!-- breakpoints -->
+<div class="md:motion-preset-fade-lg">only fades at ≥ md</div>
+
+<!-- dark mode -->
+<div class="dark:motion-preset-blur-up-md">animates in dark mode</div>
+
+<!-- group / peer -->
+<div class="group">
+  <span class="group-hover:motion-preset-slide-right-md">child slides when parent is hovered</span>
+</div>
+
+<!-- stacked -->
+<div class="md:hover:motion-preset-shake">≥md AND hovered</div>
+
+<!-- helpers also support variants now -->
+<div class="motion-preset-pulse-md hover:wait">freezes mid-loop on hover</div>
 ```
 
 ## Contributing

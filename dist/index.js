@@ -282,6 +282,12 @@ const springPerceptualMultipliers = {
     'var(--motion-bounce)': '2',
 };
 
+// Resolve a preset size token to a value. Accepts named tiers (xs/sm/md/lg)
+// from the map, or arbitrary bracket syntax like `[10px]` / `[2rem]` / `[15%]`.
+// Falls back to the map's `md` if the token is unknown.
+const pickSize = (size, map) =>
+    size && size.startsWith('[') ? size.slice(1, -1) : (map[size] || map.md);
+
 
 
 export const presetTailwindMotion = () => ({
@@ -377,16 +383,24 @@ export const presetTailwindMotion = () => ({
     },
     extendTheme: (theme) => ({
         ...theme,
-        motionBackgroundColor: flattenColorPalette(theme.colors),
-        motionTextColor: flattenColorPalette(theme.colors),
+        motionBackgroundColor: {
+            DEFAULT: 'currentColor',
+            ...flattenColorPalette(theme.colors),
+        },
+        motionTextColor: {
+            DEFAULT: 'currentColor',
+            ...flattenColorPalette(theme.colors),
+        },
         animationDuration: {
-            ...theme.transitionDuration,
+            DEFAULT: '750ms',
+            ...theme.duration,
             1500: "1500ms",
             2000: "2000ms",
         },
         animationTimingFunction: {
-            ...theme.transitionTimingFunction,
-            
+            DEFAULT: 'linear',
+            ...theme.easing,
+
             'spring-smooth': 'var(--motion-spring-smooth)',
             'spring-snappy': 'var(--motion-spring-snappy)', 
             'spring-bouncy': 'var(--motion-spring-bouncy)',
@@ -411,6 +425,7 @@ export const presetTailwindMotion = () => ({
             'in-out-back': 'cubic-bezier(0.68,-0.55,0.27,1.55)',
         },
         animationLoopCount: {
+            DEFAULT: 'infinite',
             infinite: 'infinite',
             once: '1',
             twice: '2',
@@ -941,7 +956,7 @@ export const presetTailwindMotion = () => ({
             return {
                 '--motion-loop-text-color': textColor,
                 '--motion-text-color-loop-animation': textColorLoopAnimation(modifier || "mirror"),
-                'animationComposition': 'accumulate',
+                'animation-composition': 'accumulate',
                 'animation': 'var(--motion-all-loop-and-enter-animations)',
             };
         }, { autocomplete: ['motion-text-loop', 'motion-text-loop-$colors/mirror', 'motion-text-loop-$colors/reset'] }],
@@ -1050,8 +1065,9 @@ export const presetTailwindMotion = () => ({
             const isSpringWithBounce = ['var(--motion-spring-bouncy)', 'var(--motion-spring-bouncier)', 'var(--motion-spring-bounciest)', 'var(--motion-bounce)'].includes(ease);
 
             if (modifier) {
-                const prop = modifier === 'blur' || modifier === 'grayscale' ? 'filter' : 
-                            modifier === 'background' ? 'background-color' : 
+                const prop = modifier === 'blur' || modifier === 'grayscale' ? 'filter' :
+                            modifier === 'background' ? 'background-color' :
+                            modifier === 'text' ? 'text-color' :
                             modifier;
                 return {
                     [`--motion-${prop}-timing`]: ease,
@@ -1109,30 +1125,24 @@ export const presetTailwindMotion = () => ({
             return { "--motion-loop-count": loopCount };
         }, { autocomplete: ['motion-loop', 'motion-loop-infinite', 'motion-loop-[<num>]', 'motion-loop-<num>/(scale|translate|rotate|blur|grayscale|opacity|background|text)'] }],
 
-        [/^motion-paused$/, () => {
+        [/^motion-paused$/, (_, { rawSelector }) => {
+            const selector = e(rawSelector)
             return `
-                .motion-paused {
-                    animation-play-state: paused;
-                }
-                .motion-paused::before {
-                    animation-play-state: paused;
-                }
-                .motion-paused::after {
-                    animation-play-state: paused;
+                ${selector},
+                ${selector}::before,
+                ${selector}::after {
+                    animation-play-state: paused !important;
                 }
             `
         }, { autocomplete: 'motion-paused' }],
 
-        [/^motion-running$/, () => {
+        [/^motion-running$/, (_, { rawSelector }) => {
+            const selector = e(rawSelector)
             return `
-                .motion-running {
-                    animation-play-state: running;
-                }
-                .motion-running::before {
-                    animation-play-state: running;
-                }
-                .motion-running::after {
-                    animation-play-state: running;
+                ${selector},
+                ${selector}::before,
+                ${selector}::after {
+                    animation-play-state: running !important;
                 }
             `
         }, { autocomplete: 'motion-running' }],
@@ -1151,97 +1161,103 @@ export const presetTailwindMotion = () => ({
         // Fades
         [/^motion-preset-fade(-(.+))?$/, ([, , size = 'DEFAULT']) => {
             const durations = {
+                xs: "150ms",
                 sm: "300ms",
                 md: "500ms",
                 lg: "800ms",
             };
-            
+
             return {
                 "--motion-origin-opacity": 0.001, // Use 0.001 instead of 0 to avoid Lighthouse CLS false positives
-                "--motion-duration": durations[size] || durations.md,
+                "--motion-duration": pickSize(size, durations),
                 "--motion-opacity-in-animation": opacityInAnimation,
                 animation: "var(--motion-all-loop-and-enter-animations)",
             };
-        }, { autocomplete: ['motion-preset-fade', 'motion-preset-fade-(sm|md|lg)'] }],
+        }, { autocomplete: ['motion-preset-fade', 'motion-preset-fade-(xs|sm|md|lg)', 'motion-preset-fade-[<num>]'] }],
 
         // Slides
-        [/^motion-preset-slide-(right|left|up|down)(-(.+))?$/, ([, direction, , size = 'DEFAULT']) => {
+        [/^motion-preset-slide-(right|left|up|down)(?!-(?:right|left))(-(.+))?$/, ([, direction, , size = 'DEFAULT']) => {
             const distance = {
+                xs: "2%",
                 sm: "5%",
                 md: "25%",
                 lg: "100%",
             };
             const translateProperty = direction === 'right' || direction === 'left' ? 'x' : 'y';
             const sign = direction === 'right' || direction === 'down' ? '-' : '';
-            
+
             return {
-                [`--motion-origin-translate-${translateProperty}`]: `${sign}${distance[size] || distance.md}`,
+                [`--motion-origin-translate-${translateProperty}`]: `${sign}${pickSize(size, distance)}`,
                 "--motion-origin-opacity": 0.001, // Use 0.001 instead of 0 to avoid Lighthouse CLS false positives
                 "--motion-opacity-in-animation": opacityInAnimation,
                 "--motion-translate-in-animation": translateInAnimation,
                 animation: "var(--motion-all-loop-and-enter-animations)", // Updated to match reference
             };
-        }, { autocomplete: ['motion-preset-slide', 'motion-preset-slide-right', 'motion-preset-slide-left', 'motion-preset-slide-up', 'motion-preset-slide-down', 'motion-preset-slide-(right|left|up|down)-(sm|md|lg)'] }],
+        }, { autocomplete: ['motion-preset-slide-right', 'motion-preset-slide-left', 'motion-preset-slide-up', 'motion-preset-slide-down', 'motion-preset-slide-(right|left|up|down)-(xs|sm|md|lg)', 'motion-preset-slide-(right|left|up|down)-[<num>]'] }],
         // Slide in 4 corners
         [/^motion-preset-slide-(up-right|up-left|down-left|down-right)(-(.+))?$/, ([, direction, , size = 'DEFAULT']) => {
             const distance = {
+                xs: "2%",
                 sm: "5%",
-                md: "25%", 
+                md: "25%",
                 lg: "100%",
             };
             const [vertical, horizontal] = direction.split('-');
             const signX = horizontal === 'right' ? '-' : '';
             const signY = vertical === 'down' ? '-' : '';
-            
+
             return {
-                "--motion-origin-translate-x": `${signX}${distance[size] || distance.md}`,
-                "--motion-origin-translate-y": `${signY}${distance[size] || distance.md}`,
+                "--motion-origin-translate-x": `${signX}${pickSize(size, distance)}`,
+                "--motion-origin-translate-y": `${signY}${pickSize(size, distance)}`,
                 "--motion-origin-opacity": 0.001, // Use 0.001 instead of 0 to avoid Lighthouse CLS false positives
                 "--motion-opacity-in-animation": opacityInAnimation,
                 "--motion-translate-in-animation": translateInAnimation,
                 animation: "var(--motion-all-loop-and-enter-animations)",
             };
-        }, { autocomplete: ['motion-preset-slide', 'motion-preset-slide-up-right', 'motion-preset-slide-up-left', 'motion-preset-slide-down-left', 'motion-preset-slide-down-right', 'motion-preset-slide-(up-right|up-left|down-left|down-right)-(sm|md|lg)'] }],
+        }, { autocomplete: ['motion-preset-slide-up-right', 'motion-preset-slide-up-left', 'motion-preset-slide-down-left', 'motion-preset-slide-down-right', 'motion-preset-slide-(up-right|up-left|down-left|down-right)-(sm|md|lg)'] }],
 
         // Blurs
         [/^motion-preset-focus(-(.+))?$/, ([, , size = 'DEFAULT']) => {
             const blurSizes = {
+                xs: "0.5px",
                 sm: "1.25px",
                 md: "5px",
                 lg: "10px",
             };
             return {
-                "--motion-origin-blur": blurSizes[size] || blurSizes.md,
+                "--motion-origin-blur": pickSize(size, blurSizes),
                 "--motion-origin-opacity": 0.001, // Use 0.001 instead of 0 to avoid Lighthouse CLS false positives
                 "--motion-opacity-in-animation": opacityInAnimation,
                 "--motion-filter-in-animation": filterInAnimation,
                 animation: "var(--motion-all-loop-and-enter-animations)",
             };
-        }, { autocomplete: ['motion-preset-focus', 'motion-preset-focus-(sm|md|lg)'] }],
+        }, { autocomplete: ['motion-preset-focus', 'motion-preset-focus-(xs|sm|md|lg)', 'motion-preset-focus-[<num>]'] }],
         [/^motion-preset-blur-(right|left|up|down)(-(.+))?$/, ([, direction, , size = 'DEFAULT']) => {
             const blurSizes = {
+                xs: "0.5px",
                 sm: "1.25px",
                 md: "5px",
                 lg: "10px",
             };
             const distance = {
+                xs: "0.25%",
                 sm: "1%",
                 md: "5%",
                 lg: "25%",
             };
             const translateProperty = direction === 'right' || direction === 'left' ? 'x' : 'y';
             const sign = direction === 'right' || direction === 'down' ? '-' : '';
-            
+
             return {
-                "--motion-origin-blur": blurSizes[size] || blurSizes.md,
-                [`--motion-origin-translate-${translateProperty}`]: `${sign}${distance[size] || distance.md}`,
+                "--motion-origin-blur": pickSize(size, blurSizes),
+                [`--motion-origin-translate-${translateProperty}`]: `${sign}${pickSize(size, distance)}`,
                 "--motion-origin-opacity": 0.001, // Use 0.001 instead of 0 to avoid Lighthouse CLS false positives
                 "--motion-opacity-in-animation": opacityInAnimation,
                 "--motion-filter-in-animation": filterInAnimation,
                 "--motion-translate-in-animation": translateInAnimation,
                 animation: "var(--motion-all-loop-and-enter-animations)",
             };
-        }, { autocomplete: ['motion-preset-blur', 'motion-preset-blur-right', 'motion-preset-blur-left', 'motion-preset-blur-up', 'motion-preset-blur-down', 'motion-preset-blur-(right|left|up|down)-(sm|md|lg)'] }],
+        }, { autocomplete: ['motion-preset-blur', 'motion-preset-blur-right', 'motion-preset-blur-left', 'motion-preset-blur-up', 'motion-preset-blur-down', 'motion-preset-blur-(right|left|up|down)-(xs|sm|md|lg)', 'motion-preset-blur-(right|left|up|down)-[<num>]'] }],
 
         // Rebound
         [/^motion-preset-rebound(-(.+))?$/, ([, , direction = 'left']) => {
@@ -1444,103 +1460,111 @@ export const presetTailwindMotion = () => ({
         // PULSE
         [/^motion-preset-pulse(?:-(.+))?$/, ([, size = 'md']) => {
             const sizes = {
+                xs: '1.05',
                 sm: '1.1',
-                md: '1.25', 
+                md: '1.25',
                 lg: '1.5'
             };
+            const v = pickSize(size, sizes);
             return {
-                '--motion-loop-scale-x': sizes[size],
-                '--motion-loop-scale-y': sizes[size],
+                '--motion-loop-scale-x': v,
+                '--motion-loop-scale-y': v,
                 '--motion-timing': 'cubic-bezier(0.4, 0, 0.2, 1)',
                 '--motion-scale-loop-animation': scaleLoopAnimation('mirror'),
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-pulse-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-pulse-(xs|sm|md|lg)', 'motion-preset-pulse-[<num>]'] }],
 
         // WOBBLE
         [/^motion-preset-wobble(?:-(.+))?$/, ([, size = 'md']) => {
             const sizes = {
+                xs: '2%',
                 sm: '5%',
                 md: '15%',
                 lg: '25%'
             };
             return {
-                '--motion-loop-translate-x': sizes[size],
+                '--motion-loop-translate-x': pickSize(size, sizes),
                 '--motion-timing': 'cubic-bezier(0.4, 0, 0.2, 1)',
                 '--motion-translate-loop-animation': translateLoopAnimation('mirror'),
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-wobble-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-wobble-(xs|sm|md|lg)', 'motion-preset-wobble-[<num>]'] }],
 
         // SEESAW
         [/^motion-preset-seesaw(?:-(.+))?$/, ([, size = 'md']) => {
             const sizes = {
+                xs: '1deg',
                 sm: '3deg',
                 md: '6deg',
                 lg: '12deg'
             };
             return {
-                '--motion-loop-rotate': sizes[size],
+                '--motion-loop-rotate': pickSize(size, sizes),
                 '--motion-rotate-loop-animation': rotateLoopAnimation('mirror'),
                 '--motion-rotate-timing': 'var(--motion-spring-bounciest)',
                 '--motion-rotate-perceptual-duration-multiplier': springPerceptualMultipliers['var(--motion-spring-bounciest)'],
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-seesaw-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-seesaw-(xs|sm|md|lg)', 'motion-preset-seesaw-[<num>]'] }],
 
         // OSCILLATE
         [/^motion-preset-oscillate(?:-(.+))?$/, ([, size = 'md']) => {
             const sizes = {
+                xs: '2%',
                 sm: '5%',
                 md: '15%',
                 lg: '25%'
             };
             return {
-                '--motion-loop-translate-y': sizes[size],
+                '--motion-loop-translate-y': pickSize(size, sizes),
                 '--motion-timing': 'cubic-bezier(0.4, 0, 0.2, 1)',
                 '--motion-translate-loop-animation': translateLoopAnimation('mirror'),
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-oscillate-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-oscillate-(xs|sm|md|lg)', 'motion-preset-oscillate-[<num>]'] }],
 
         // STRETCH
         [/^motion-preset-stretch(?:-(.+))?$/, ([, size = 'md']) => {
             const xSizes = {
+                xs: '98%',
                 sm: '95%',
                 md: '85%',
                 lg: '75%'
             };
             const ySizes = {
+                xs: '102%',
                 sm: '105%',
                 md: '115%',
                 lg: '125%'
             };
             return {
-                '--motion-loop-scale-x': xSizes[size],
-                '--motion-loop-scale-y': ySizes[size],
+                '--motion-loop-scale-x': pickSize(size, xSizes),
+                '--motion-loop-scale-y': pickSize(size, ySizes),
                 '--motion-scale-timing': 'var(--motion-spring-bouncier)',
                 '--motion-scale-perceptual-duration-multiplier': springPerceptualMultipliers['var(--motion-spring-bouncier)'],
                 '--motion-scale-loop-animation': scaleLoopAnimation('mirror'),
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-stretch-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-stretch-(xs|sm|md|lg)'] }],
 
         // FLOAT
         [/^motion-preset-float(?:-(.+))?$/, ([, size = 'md']) => {
             const sizes = {
+                xs: '25%',
                 sm: '50%',
                 md: '100%',
                 lg: '150%'
             };
             return {
-                '--motion-loop-translate-y': sizes[size],
+                '--motion-loop-translate-y': pickSize(size, sizes),
                 '--motion-translate-timing': 'var(--motion-spring-bouncier)',
                 '--motion-translate-perceptual-duration-multiplier': springPerceptualMultipliers['var(--motion-spring-bouncier)'],
                 '--motion-duration': '2000ms',
                 '--motion-translate-loop-animation': translateLoopAnimation('mirror'),
                 'animation': 'var(--motion-all-loop-and-enter-animations)'
             };
-        }, { autocomplete: 'motion-preset-float-(sm|md|lg)' }],
+        }, { autocomplete: ['motion-preset-float-(xs|sm|md|lg)', 'motion-preset-float-[<num>]'] }],
 
         
         // SPIN
@@ -1624,7 +1648,7 @@ export const presetTailwindMotion = () => ({
                     100% { transform: translateY(-200%) rotate(25deg); }
                 }
             `;
-        }, { autocomplete: ['motion-preset-flomoji-👉', 'motion-preset-flomoji-🚀', 'motion-preset-flomoji-👀', 'motion-preset-flomoji-👍', 'motion-preset-flomoji-[...]'] }],
+        }, { autocomplete: ['motion-preset-flomoji-👉', 'motion-preset-flomoji-🚀', 'motion-preset-flomoji-👀', 'motion-preset-flomoji-👍'] }],
 
 
 
@@ -1645,19 +1669,19 @@ export const presetTailwindMotion = () => ({
         ===================================*/
         // Pause rule (short hand)
         ['pause', {
-            'animation-play-state': 'paused',
+            'animation-play-state': 'paused !important',
         }, { autocomplete: 'pause' }],
         ['play', {
-            'animation-play-state': 'running',
+            'animation-play-state': 'running !important',
         }, { autocomplete: 'play' }],
 
         // Wait is ideal for loading animations... just add and then remove when you want it to run...
         [/^wait$/, (_, { rawSelector }) => {
             const selector = e(rawSelector)
             return `
-                .wait, .wait::before, .wait::after,
-                .wait *, .wait *::before, .wait *::after {
-                    animation-play-state: paused;
+                ${selector}, ${selector}::before, ${selector}::after,
+                ${selector} *, ${selector} *::before, ${selector} *::after {
+                    animation-play-state: paused !important;
                 }
             `
         }, { autocomplete: 'wait' }],
@@ -1666,13 +1690,13 @@ export const presetTailwindMotion = () => ({
         [/^still$/, (_, { rawSelector }) => {
             const selector = e(rawSelector)
             return `
-                .still, .still::before, .still::after,
-                .still *, .still *::before, .still *::after {
-                    --motion-duration: 0.01ms !important;
+                ${selector}, ${selector}::before, ${selector}::after,
+                ${selector} *, ${selector} *::before, ${selector} *::after {
+                    --motion-duration: 0ms !important;
                     --motion-delay: 0ms !important;
-                    animation-duration: 0.01ms !important;
+                    animation-duration: 0ms !important;
                     animation-delay: 0ms !important;
-                    transition-duration: 0.01ms !important;
+                    transition-duration: 0ms !important;
                     transition-delay: 0ms !important;
                 }
             `

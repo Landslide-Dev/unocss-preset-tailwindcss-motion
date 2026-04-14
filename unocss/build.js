@@ -13,8 +13,11 @@ const resetCSS = fs.readFileSync(
 
 async function build() {
     try {
-        // Read the HTML file
-        const html = fs.readFileSync('test/index.html', 'utf-8')
+        // Read both test HTML files so any preset class used in either gets generated
+        const html = [
+            fs.readFileSync('test/index.html', 'utf-8'),
+            fs.readFileSync('test/easy.html', 'utf-8'),
+        ].join('\n')
         
         // Create UnoCSS generator
         const uno = createGenerator({
@@ -47,7 +50,8 @@ if (process.argv.includes('--watch')) {
     // Watch for changes
     const watcher = watch([
         'unocss/index.js',
-        'test/index.html'
+        'test/index.html',
+        'test/easy.html'
     ])
 
     watcher.on('change', async (path) => {
