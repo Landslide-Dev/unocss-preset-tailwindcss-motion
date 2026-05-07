@@ -29,17 +29,21 @@ export default defineConfig({
 It is now updated to match `v4` of the Tailwind plugin.
 
 **Latest internal additions:**
-- New `xs` size tier on every size-aware preset (slide, fade, focus, blur, pulse, wobble, seesaw, oscillate, stretch, float)
-- Arbitrary value JIT support: `motion-preset-slide-up-[10px]`, `motion-preset-fade-[1200ms]`, `motion-preset-pulse-[1.05]`, etc.
-- `wait`, `still`, `motion-paused`, `motion-running`, `pause`, `play` now apply `!important` so they reliably override animation state
-- `still` now zeroes durations to `0ms` (was `0.01ms`)
-- Bug fixes: corner slides (`motion-preset-slide-up-right` etc.) now actually animate diagonally; theme defaults wired to the correct UnoCSS keys; rule selectors interpolate `${selector}` so all UnoCSS variants (`hover:`, `focus:`, `md:`, `dark:`, `group-hover:` …) work everywhere
-- Removed dead autocomplete entries (`motion-preset-slide` bare, `motion-preset-flomoji-[...]` literal)
+- Sequential steps with the `step-N:` variant. Example: `step-1:motion-preset-slide-up step-2:motion-preset-pop`.
+- Grouped step timelines with `motion-group`. Groups read timing from any matching descendant, not just direct children.
+- Same-element translate, rotate, and scale steps now move from the current state. Repeated `step-N:motion-preset-slide-up-lg` stacks upward, and repeated `step-N:motion-preset-expand` keeps growing instead of restarting from zero.
+- Step timing offsets with `motion-gap-*` and `motion-overlap-*` for starting the next step later or earlier than the previous step end.
+- Sequence repeat utilities: `motion-repeat`, `motion-repeat-delay-*`, `motion-repeat-count-*`, plus the optional `dist/repeat.js` helper that replays a completed step group.
+- Time modifiers accept theme keys, raw millisecond values, raw seconds, and bracketed values: `motion-duration-5000`, `motion-duration-1s`, `motion-duration-[0.4s]`, `motion-delay-[250ms]`.
+- Reduced motion now hard-sets animation and transition durations/delays to `0s !important`.
+- Existing v4 additions still apply: `xs` size tiers, arbitrary preset values, reliable `wait`/`still`/pause/play overrides, fixed diagonal corner slides, fixed negative translate/rotate handling, and full UnoCSS variant support.
 
 
 ## Demo
 
 [Giant Test Page](https://animations.tips.io)
+
+This repo includes local torture pages: `test/individual-animations.html` for single utilities, presets, arbitrary values, and combinations; `test/variants.html` for Tailwind-style state, group, peer, dark, responsive, structural, and stacked variants; `test/modifiers.html` for timing, easing, loop, wait/still/pause/play, repeat, group, and step modifiers; and `test/step-path-torture.html` for step-path behavior, nested groups, skipped steps, explicit exits, display-ad style timelines, and `wait` sanity checks.
 
 
 ## Why?
@@ -93,9 +97,97 @@ Adjust duration, spring, delay and loop modifiers
 <div class="motion-translate-y-loop-75 motion-loop-twice">Loop 2x</div>
 <div class="motion-translate-y-in motion-duration-2000 motion-ease-spring-bouncy">2000ms speed, bouncy</div>
 
+
+<!--
+SEQUENTIAL STEPS
+Use step-N: to put motion utilities on a timeline.
+-->
+<div class="step-1:motion-preset-slide-up step-2:motion-preset-pop"></div>
+
+
+<!--
+GROUPED TIMELINES
+Use motion-group when different descendants need to share one timeline.
+-->
+<div class="motion-group">
+    <h1 class="step-1:motion-preset-slide-down-lg step-1:motion-duration-5000">Hello</h1>
+    <h2 class="step-2:motion-preset-slide-up-sm">World</h2>
+</div>
+
 ```
 
-Making sense? Easy, great! Check out the million options below:
+## Sequential Steps and Groups
+
+Steps let you write a timeline directly in class names. Prefix any motion utility with `step-N:` and that utility runs in that numbered slot.
+
+```html
+<div class="step-1:motion-preset-fade step-2:motion-preset-slide-up step-3:motion-preset-pop">
+    I fade, then slide, then pop.
+</div>
+```
+
+No step prefix means normal motion behavior. One element with multiple `step-N:` utilities becomes a sequence on that element. A `motion-group` lets multiple descendants share the same sequence clock.
+
+```html
+<div class="motion-group">
+    <h1 class="step-1:motion-preset-slide-down-lg step-1:motion-duration-5000">
+        Hello
+    </h1>
+
+    <h2 class="step-2:motion-preset-slide-up-sm">
+        World
+    </h2>
+</div>
+```
+
+In that example, `World` waits for step 1's 5000ms animation before step 2 starts. The group reads step timing modifiers from matching descendants anywhere inside the group, so nested wrappers are fine.
+
+Without a group, each element computes its own timeline. That is useful when you want independent animations. Add `motion-group` when separate children should behave like one timeline.
+
+### Same-Element Paths
+
+On the same element, stepped translate, rotate, and scale utilities move from the current state instead of restarting from zero. This makes repeated directional and growth motion behave like a path.
+
+```html
+<h2 class="step-1:motion-preset-slide-up-lg step-2:motion-preset-slide-down-lg step-3:motion-preset-slide-right-lg">
+    What is up?
+</h2>
+```
+
+If all three steps were `motion-preset-slide-up-lg`, the element would keep moving higher on each step. Repeated scale presets like `step-1:motion-preset-expand step-2:motion-preset-expand` grow again on each step. A separate child with only `step-2:motion-preset-slide-up-lg` still behaves like a normal delayed entrance.
+
+### Gap and Overlap
+
+Use `motion-gap-*` and `motion-overlap-*` through a step prefix to start a step later or earlier relative to the previous step end.
+
+```html
+<div class="motion-group">
+    <div class="step-1:motion-preset-fade step-1:motion-duration-1000">One</div>
+    <div class="step-2:motion-preset-slide-up step-2:motion-overlap-300">Two</div>
+    <div class="step-3:motion-preset-pop step-3:motion-gap-[1.2s]">Three</div>
+</div>
+```
+
+`step-2:motion-overlap-300` starts 300ms before step 1 ends. `step-3:motion-gap-[1.2s]` starts 1.2s after step 2 ends.
+
+### Repeating a Sequence
+
+`motion-repeat` marks a group for replay. The CSS utilities configure the repeat, and the JS helper does the actual replay by measuring the completed step animations and remounting the group.
+
+```html
+<div class="motion-group motion-repeat motion-repeat-delay-[5s] motion-repeat-count-3">
+    <h1 class="step-1:motion-preset-slide-up">Frame one</h1>
+    <p class="step-2:motion-preset-fade">Frame two</p>
+</div>
+
+<script type="module">
+    import { initMotionRepeats } from 'unocss-preset-tailwindcss-motion/dist/repeat.js'
+
+    initMotionRepeats()
+</script>
+```
+
+`motion-repeat` defaults to infinite repeats with no hold delay. `motion-repeat-delay-[5s]` holds the final state for 5 seconds before replay. `motion-repeat-count-3` means three total plays, including the first render. If you only generate the CSS and never call the helper, the repeat variables exist but the full sequence will not replay.
 
 ## Full Docs & Reference
 
@@ -332,14 +424,51 @@ motion-preset-flomoji-[Woah!]
 ```
 motion-duration
 motion-duration-(75|100|150|200|300|500|700|1000|1500|2000)
+motion-duration-<number>            // motion-duration-5000 => 5000ms
+motion-duration-<seconds>           // motion-duration-1s
+motion-duration-[<value>]           // motion-duration-[0.4s], motion-duration-[250ms], motion-duration-[var(--speed)]
 motion-duration-(75|100|150|200|300|500|700|1000|1500|2000)/(scale|translate|rotate|blur|grayscale|opacity|background|text)
+motion-duration-[<value>]/(scale|translate|rotate|blur|grayscale|opacity|background|text)
 ```
 
 #### Delay
 ```
 motion-delay
 motion-delay-(75|100|150|200|300|500|700|1000)
+motion-delay-<number>               // motion-delay-5000 => 5000ms
+motion-delay-<seconds>              // motion-delay-1s
+motion-delay-[<value>]              // motion-delay-[0.4s], motion-delay-[250ms], motion-delay-[var(--wait)]
 motion-delay-(75|100|150|200|300|500|700|1000)/(scale|translate|rotate|blur|grayscale|opacity|background|text)
+motion-delay-[<value>]/(scale|translate|rotate|blur|grayscale|opacity|background|text)
+```
+
+#### Step Variant
+```
+step-<n>:motion-*
+step-<n>:-motion-*
+
+step-1:motion-preset-slide-up
+step-2:motion-preset-pop
+step-3:-motion-translate-x-in-100
+
+step-<n>:motion-duration-*
+step-<n>:motion-delay-*
+step-<n>:motion-ease-*
+```
+
+Each step defaults to `500ms`. `step-N:motion-duration-*` changes the length of that step. `step-N:motion-delay-*` adds delay inside that step after the step's calculated start time.
+
+#### Step Gap and Overlap
+```
+step-<n>:motion-gap
+step-<n>:motion-gap-(50|75|100|150|200|300|500|1000)
+step-<n>:motion-gap-<seconds>
+step-<n>:motion-gap-[<value>]
+
+step-<n>:motion-overlap
+step-<n>:motion-overlap-(50|75|100|150|200|300|500|1000)
+step-<n>:motion-overlap-<seconds>
+step-<n>:motion-overlap-[<value>]
 ```
 
 #### Easing
@@ -363,8 +492,31 @@ motion-ease-{any-of-above}/(scale|translate|rotate|blur|grayscale|opacity|backgr
 ```
 motion-loop
 motion-loop-infinite
+motion-loop-once
+motion-loop-twice
 motion-loop-[number]
-motion-loop-(infinite|number)/(scale|translate|rotate|blur|grayscale|opacity|background|text)
+motion-loop-(infinite|once|twice|number)/(scale|translate|rotate|blur|grayscale|opacity|background|text)
+```
+
+#### Repeat Sequence
+```
+motion-repeat
+motion-repeat-delay
+motion-repeat-delay-(500|1000|1500|2000)
+motion-repeat-delay-<seconds>
+motion-repeat-delay-[<value>]
+
+motion-repeat-count-infinite
+motion-repeat-count-once
+motion-repeat-count-twice
+motion-repeat-count-<number>
+```
+
+`motion-repeat` marks a group for the `dist/repeat.js` helper. It does not replay the whole group by itself without the helper.
+
+#### Group
+```
+motion-group
 ```
 
 #### Mirror and Reset
@@ -399,7 +551,7 @@ motion-running
 
 ### Smart Extras
 
-These are not part of the original library, see "What's Different" below for more info. All apply with `!important` so they reliably override animation state regardless of source-order or specificity.
+These are not part of the original library, see "What's Different" below for more info. Pause/state helpers apply with `!important` so they reliably override animation state regardless of source-order or specificity.
 
 ```css
 /* Short-hand pause (animation-play-state: paused) */
@@ -416,12 +568,20 @@ These are not part of the original library, see "What's Different" below for mor
 /* Motion = 0, completes (or kills) animations forcefully — different from pause.
    Sets every duration and delay to 0ms !important and cascades to children. */
 .still
+
+/* Shared timeline for descendant step animations */
+.motion-group
+
+/* Repeat markers for the dist/repeat.js helper */
+.motion-repeat
+.motion-repeat-delay-*
+.motion-repeat-count-*
 ```
 
 
 ## What's different?
 
-Not much. This should be near identical for 99% of purposes.
+The core animation utilities are still intended to be near identical to the Tailwind plugin. The sections below cover the main UnoCSS-specific differences and extra utilities.
 
 
 
@@ -434,15 +594,17 @@ Rather than doing that, this library will automatically add the following for si
 ```css
  @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
-        --motion-duration: 0.01ms !important;
-        --motion-delay: 0ms !important;
-        animation-duration: 0.01ms !important;
-        animation-delay: 0ms !important;
-        transition-duration: 0.01ms !important;
-        transition-delay: 0ms !important;
+        --motion-duration: 0s !important;
+        --motion-delay: 0s !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
     }
 }
 ```
+
+This intentionally uses `0s`, not a tiny fallback duration. The tiny-duration trick can leave weird timing and end-state behavior in real sequences.
 
 ### ::backdrop
 
@@ -538,11 +700,11 @@ You don't need to do anything special — every UnoCSS variant from `presetUno` 
 
 ## Contributing
 
-- The folder tailwind is for the tailwind styles, `tailwindcss-motion-reference` is detached just for easy file comparison and is not used.
-- To dev it up here... just run `npm run dev`
-- To see the test file, just run `npm run serve`
-- To build it all, just run `npm run build`
-- For more, reference `package.json`. This may get more sophisticated later but does have a 1 vs the other mode.
+- The folder `tailwind` is for the Tailwind comparison styles. `tailwindcss-motion-reference` is detached for file comparison and is not used by the preset.
+- To develop the UnoCSS output, run `npm run dev`.
+- To build everything, run `npm run build`.
+- For the current demo pages, serve this package folder and open `test/individual-animations.html`, `test/variants.html`, `test/modifiers.html`, or `test/step-path-torture.html`.
+- For more, reference `package.json`.
 
 ## License
 
