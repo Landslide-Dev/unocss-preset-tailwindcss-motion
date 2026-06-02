@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Timeline Motion Lab</title>
+    <link rel="stylesheet" href="../unocss/uno.css">
+    <style>
+        :root {
+            --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            --ink: #152033;
+            --muted: #64748b;
+            --line: #d8e1ee;
+            --panel: #ffffff;
+            --soft: #f5f8fc;
+            --nav: #101827;
+            --blue: #1f63c8;
+            --green: #0f8a6a;
+            --pink: #b22a6f;
+            --gold: #b7791f;
+            --red: #c2412d;
+            --teal: #0f766e;
+        }
+
+        * { box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 76px;
+        }
+
+        body {
+            margin: 0;
+            background: var(--soft);
+            color: var(--ink);
+            font-family: var(--font-ui);
+            line-height: 1.45;
+        }
+
+        code,
+        .mono {
+            font-family: var(--font-mono);
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 54px;
+            padding: 10px clamp(16px, 4vw, 40px);
+            background: rgba(255, 255, 255, .94);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(14px);
+        }
+
+        .topbar a,
+        .topbar button {
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            background: #ffffff;
+            color: #172033;
+            cursor: pointer;
+            font: 800 12px/1 var(--font-ui);
+            padding: 9px 11px;
+            text-decoration: none;
+        }
+
+        .topbar a[aria-current="page"] {
+            background: #101827;
+            color: #ffffff;
+        }
+
+        .topbar .spacer { flex: 1; }
+
+        .hero {
+            min-height: 98vh;
+            display: grid;
+            align-content: end;
+            overflow: clip;
+            padding: clamp(28px, 5vw, 70px);
+            background:
+                linear-gradient(90deg, rgba(31, 99, 200, .08) 1px, transparent 1px),
+                linear-gradient(rgba(178, 42, 111, .08) 1px, transparent 1px),
+                #ffffff;
+            background-size: 26px 26px, 26px 26px, auto;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .kicker {
+            color: var(--pink);
+            font: 900 12px/1 var(--font-ui);
+            letter-spacing: .12em;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            max-width: 1120px;
+            margin: 0;
+            color: #0f172a;
+            font-size: clamp(44px, 7.5vw, 116px);
+            line-height: .82;
+        }
+
+        .intro {
+            max-width: 920px;
+            margin: 18px 0 0;
+            color: #475569;
+            font-size: clamp(16px, 2vw, 20px);
+            font-weight: 650;
+        }
+
+        .jump-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 22px;
+        }
+
+        .jump-list a {
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: #f8fafc;
+            color: #172033;
+            font: 800 12px/1 var(--font-ui);
+            padding: 8px 10px;
+            text-decoration: none;
+        }
+
+        .hero-lab {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: stretch;
+            max-width: 1040px;
+            margin-top: 24px;
+        }
+
+        .probe {
+            min-height: 126px;
+            display: grid;
+            gap: 10px;
+            align-content: center;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .94);
+            padding: 16px;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, .08);
+        }
+
+        .probe strong {
+            color: #0f172a;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .probe-output {
+            display: grid;
+            gap: 4px;
+            color: #475569;
+            font: 750 12px/1.35 var(--font-mono);
+        }
+
+        .root-scrub {
+            width: 126px;
+            min-height: 126px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: #111827;
+            color: #ffffff;
+            font: 900 34px/.8 var(--font-ui);
+            box-shadow: 0 16px 40px rgba(15, 23, 42, .18);
+        }
+
+        .progress-dial {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 30;
+            width: 72px;
+            aspect-ratio: 1;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #111827;
+            color: #ffffff;
+            font: 900 13px/1 var(--font-mono);
+            box-shadow: 0 16px 38px rgba(15, 23, 42, .26);
+        }
+
+        main {
+            display: grid;
+            gap: 38vh;
+            max-width: 1480px;
+            margin: 0 auto;
+            padding: 38px clamp(18px, 4vw, 48px) 150vh;
+        }
+
+        .doc-section {
+            display: grid;
+            gap: 16px;
+            overflow: clip;
+        }
+
+        .section-head {
+            display: grid;
+            gap: 8px;
+            max-width: 1040px;
+        }
+
+        .section-kicker {
+            color: var(--pink);
+            font: 900 11px/1 var(--font-ui);
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            margin: 0;
+            color: #101827;
+            font-size: clamp(32px, 4vw, 64px);
+            line-height: .9;
+        }
+
+        .section-head p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        .case-stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .case-row {
+            display: grid;
+            grid-template-columns: minmax(320px, .88fr) minmax(420px, 1.12fr);
+            min-height: 260px;
+            overflow: clip;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background:
+                linear-gradient(90deg, rgba(15, 23, 42, .05) 1px, transparent 1px),
+                linear-gradient(rgba(15, 23, 42, .05) 1px, transparent 1px),
+                #f8fafc;
+            background-size: 18px 18px, 18px 18px, auto;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+        }
+
+        .case-row--rootScrubLab {
+            min-height: 820px;
+            overflow: visible;
+        }
+
+        .case-row--stepScrollbox,
+        .case-row--timingScrollbox {
+            min-height: 560px;
+        }
+
+        .case-row--rootScrubLab .demo-stage,
+        .case-row--stepScrollbox .demo-stage,
+        .case-row--timingScrollbox .demo-stage {
+            align-items: stretch;
+        }
+
+        .case-copy {
+            display: grid;
+            align-content: start;
+            gap: 12px;
+            min-width: 0;
+            padding: 16px;
+            border-right: 1px solid #e1e8f2;
+            background: #ffffff;
+        }
+
+        .case-title {
+            margin: 0;
+            color: #0f172a;
+            font-size: clamp(20px, 2vw, 30px);
+            line-height: .95;
+        }
+
+        .case-note {
+            margin: 0;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        .code-sample {
+            margin: 0;
+            max-width: 100%;
+            overflow-x: auto;
+            border-radius: 6px;
+            background: #111827;
+            color: #dbeafe;
+            font: 700 12px/1.55 var(--font-mono);
+            padding: 13px;
+            white-space: pre-wrap;
+        }
+
+        .class-token {
+            display: inline-block;
+            margin: 1px 2px 1px 0;
+            padding: 1px 5px;
+            border-radius: 5px;
+            background: rgba(148, 163, 184, .16);
+            color: #dbeafe;
+            font-weight: 850;
+        }
+
+        .class-token--timeline { background: rgba(20, 184, 166, .26); color: #ccfbf1; }
+        .class-token--range { background: rgba(245, 158, 11, .24); color: #fde68a; }
+        .class-token--preset { background: rgba(37, 99, 235, .28); color: #bfdbfe; }
+        .class-token--modifier { background: rgba(16, 185, 129, .22); color: #bbf7d0; }
+        .class-token--state { background: rgba(239, 68, 68, .22); color: #fecaca; }
+
+        .demo-stage {
+            position: relative;
+            min-width: 0;
+            min-height: 260px;
+            display: grid;
+            place-items: center;
+            overflow: clip;
+            padding: 24px;
+        }
+
+        .demo-card {
+            width: min(100%, 460px);
+            min-height: 170px;
+            display: grid;
+            align-content: space-between;
+            gap: 18px;
+            border: 1px solid rgba(15, 23, 42, .12);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+            padding: 22px;
+        }
+
+        .demo-card h3 {
+            margin: 0;
+            color: #111827;
+            font-size: clamp(24px, 2.8vw, 40px);
+            line-height: .9;
+        }
+
+        .demo-card p {
+            margin: 8px 0 0;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .demo-token {
+            display: inline-grid;
+            place-items: center;
+            width: 92px;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            color: #ffffff;
+            font: 900 35px/.8 var(--font-ui);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .16);
+        }
+
+        .demo-token--blue { background: var(--blue); }
+        .demo-token--green { background: var(--green); }
+        .demo-token--pink { background: var(--pink); }
+        .demo-token--gold { background: var(--gold); }
+        .demo-token--red { background: var(--red); }
+        .demo-token--teal { background: var(--teal); }
+
+        .mini-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .pill {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #334155;
+            font: 850 12px/1 var(--font-ui);
+            padding: 8px 10px;
+        }
+
+        .scroll-strip {
+            width: min(100%, 560px);
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .scroll-piece {
+            min-height: 124px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #111827;
+            font: 900 26px/.8 var(--font-ui);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, .12);
+        }
+
+        .root-dashboard {
+            width: min(100%, 680px);
+            display: grid;
+            gap: 12px;
+        }
+
+        .root-meter,
+        .range-meter {
+            display: grid;
+            gap: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .92);
+            padding: 12px;
+        }
+
+        .root-meter__track,
+        .range-track {
+            height: 12px;
+            overflow: clip;
+            border-radius: 999px;
+            background: #e2e8f0;
+        }
+
+        .root-meter__fill {
+            width: 100%;
+            height: 100%;
+            transform: scaleX(var(--root-progress, 0));
+            transform-origin: left center;
+            background: linear-gradient(90deg, var(--blue), var(--pink), var(--gold));
+        }
+
+        .root-meter__text,
+        .range-meter__text,
+        .root-debug {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: #475569;
+            font: 850 12px/1 var(--font-mono);
+        }
+
+        .root-samples {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .root-scroll-lab {
+            width: min(100%, 760px);
+            min-height: 720px;
+            display: grid;
+            align-content: start;
+            gap: 12px;
+        }
+
+        .root-scroll-panel {
+            position: sticky;
+            top: 74px;
+            display: grid;
+            gap: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .96);
+            box-shadow: 0 18px 44px rgba(15, 23, 42, .16);
+            padding: 14px;
+        }
+
+        .root-scroll-note,
+        .local-note {
+            margin: 0;
+            color: #475569;
+            font: 850 13px/1.35 var(--font-ui);
+        }
+
+        .root-lane-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .root-lane {
+            display: grid;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .root-lane .scroll-piece {
+            min-height: 116px;
+            align-content: center;
+            gap: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .root-lane-label {
+            color: #475569;
+            font: 900 12px/1.25 var(--font-ui);
+        }
+
+        .progress-chip {
+            justify-self: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #334155;
+            font: 850 11px/1 var(--font-mono);
+            padding: 6px 8px;
+        }
+
+        .range-track {
+            position: relative;
+        }
+
+        .range-fill {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: var(--range-left, 0%);
+            width: var(--range-width, 100%);
+            border-radius: 999px;
+            background: var(--range-color, var(--blue));
+        }
+
+        .range-markers {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            color: #64748b;
+            font: 850 11px/1 var(--font-ui);
+            text-align: center;
+        }
+
+        .range-markers span:first-child { text-align: left; }
+        .range-markers span:last-child { text-align: right; }
+
+        .nearest-scrollbox,
+        .self-scrollbox,
+        .step-scrollbox,
+        .timing-scrollbox {
+            width: min(100%, 560px);
+            max-height: 300px;
+            overflow: auto;
+            overscroll-behavior: contain;
+            border: 2px solid #0f172a;
+            border-radius: 8px;
+            background:
+                linear-gradient(90deg, rgba(31, 99, 200, .08) 1px, transparent 1px),
+                linear-gradient(rgba(15, 23, 42, .07) 1px, transparent 1px),
+                #ffffff;
+            background-size: 18px 18px, 18px 18px, auto;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+            padding: 20px;
+            scrollbar-color: #0f172a #dbe3ee;
+            scrollbar-width: auto;
+        }
+
+        .step-scrollbox,
+        .timing-scrollbox {
+            width: min(100%, 820px);
+            max-height: 430px;
+        }
+
+        .nearest-scrollbox::-webkit-scrollbar,
+        .self-scrollbox::-webkit-scrollbar,
+        .step-scrollbox::-webkit-scrollbar,
+        .timing-scrollbox::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+
+        .nearest-scrollbox::-webkit-scrollbar-track,
+        .self-scrollbox::-webkit-scrollbar-track,
+        .step-scrollbox::-webkit-scrollbar-track,
+        .timing-scrollbox::-webkit-scrollbar-track {
+            background: #dbe3ee;
+            border-radius: 999px;
+        }
+
+        .nearest-scrollbox::-webkit-scrollbar-thumb,
+        .self-scrollbox::-webkit-scrollbar-thumb,
+        .step-scrollbox::-webkit-scrollbar-thumb,
+        .timing-scrollbox::-webkit-scrollbar-thumb {
+            background: #0f172a;
+            border: 3px solid #dbe3ee;
+            border-radius: 999px;
+        }
+
+        .nearest-scrollcontent,
+        .self-scrollcontent,
+        .step-scrollcontent,
+        .timing-scrollcontent {
+            min-height: 720px;
+            display: grid;
+            align-content: start;
+            gap: 18px;
+        }
+
+        .step-scrollcontent,
+        .timing-scrollcontent {
+            min-height: 1080px;
+        }
+
+        .nearest-scrollcontent {
+            justify-items: start;
+        }
+
+        .step-scroll-pin,
+        .timing-scroll-pin {
+            position: sticky;
+            top: 54px;
+            z-index: 1;
+            display: grid;
+            gap: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .95);
+            padding: 14px;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .12);
+        }
+
+        .local-meter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #334155;
+            font: 850 12px/1 var(--font-mono);
+            padding: 10px;
+        }
+
+        .scrollbox-label {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            justify-self: stretch;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            background: rgba(255, 255, 255, .94);
+            color: #0f172a;
+            font: 900 12px/1 var(--font-ui);
+            letter-spacing: .08em;
+            padding: 10px 12px;
+            text-transform: uppercase;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, .12);
+        }
+
+        .scroll-piece--sticky {
+            position: sticky;
+            top: 54px;
+            z-index: 1;
+        }
+
+        .scroll-cluster {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+
+        .scroll-band {
+            min-height: 150px;
+            display: grid;
+            align-items: center;
+        }
+
+        .scroll-ruler {
+            min-height: 220px;
+            display: grid;
+            place-items: end start;
+            border-top: 1px dashed #cbd5e1;
+            color: #64748b;
+            font: 900 12px/1 var(--font-ui);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+            width: min(100%, 720px);
+        }
+
+        .multi-grid {
+            width: min(100%, 860px);
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .mini-card {
+            min-height: 150px;
+            display: grid;
+            align-content: space-between;
+            gap: 14px;
+            border: 1px solid rgba(15, 23, 42, .12);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .12);
+            padding: 18px;
+        }
+
+        .mini-card h3 {
+            margin: 0;
+            color: #111827;
+            font-size: clamp(18px, 2vw, 28px);
+            line-height: .95;
+        }
+
+        .step-board {
+            width: min(100%, 820px);
+            display: grid;
+            gap: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .94);
+            padding: 18px;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+        }
+
+        .step-board--compact {
+            width: min(100%, 680px);
+            padding: 14px;
+        }
+
+        .step-board--compact .mini-card {
+            min-height: 116px;
+            padding: 14px;
+        }
+
+        .step-board--compact .mini-card h3 {
+            font-size: clamp(15px, 1.4vw, 21px);
+        }
+
+        .step-board--wide {
+            width: min(100%, 980px);
+        }
+
+        .step-board--tall .mini-card {
+            min-height: 220px;
+            align-content: center;
+        }
+
+        .step-board--dense {
+            width: min(100%, 980px);
+        }
+
+        .step-board--dense .step-row {
+            gap: 8px;
+        }
+
+        .step-board--dense .mini-card {
+            min-height: 116px;
+            padding: 14px;
+        }
+
+        .step-board--dense .mini-card h3 {
+            font-size: clamp(14px, 1.25vw, 20px);
+        }
+
+        .step-row {
+            display: grid;
+            grid-template-columns: repeat(var(--step-columns, 4), minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .step-row--local {
+            --step-columns: 5;
+        }
+
+        .timing-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .step-note {
+            margin: 0;
+            color: #64748b;
+            font: 850 13px/1.35 var(--font-ui);
+        }
+
+        .variant-shell {
+            width: min(100%, 820px);
+            display: grid;
+            gap: 12px;
+        }
+
+        .variant-target {
+            display: grid;
+            place-items: center;
+            min-height: 180px;
+            border: 2px solid #0f172a;
+            border-radius: 8px;
+            background: #ffffff;
+            cursor: pointer;
+            padding: 18px;
+        }
+
+        .variant-peer {
+            position: absolute;
+            inline-size: 1px;
+            block-size: 1px;
+            opacity: 0;
+        }
+
+        .variant-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            border: 1px solid #0f172a;
+            border-radius: 7px;
+            background: #0f172a;
+            color: #ffffff;
+            cursor: pointer;
+            font: 900 12px/1 var(--font-ui);
+            padding: 12px 14px;
+        }
+
+        .wait-lab {
+            width: min(100%, 760px);
+            display: grid;
+            gap: 12px;
+        }
+
+        .wait-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .94);
+            padding: 12px;
+        }
+
+        .wait-toolbar button {
+            border: 1px solid #0f172a;
+            border-radius: 7px;
+            background: #0f172a;
+            color: #ffffff;
+            cursor: pointer;
+            font: 900 12px/1 var(--font-ui);
+            padding: 9px 12px;
+        }
+
+        .wait-toolbar span {
+            color: #64748b;
+            font: 850 12px/1.2 var(--font-mono);
+        }
+
+        .section-spacer {
+            min-height: 30vh;
+            display: grid;
+            place-items: center;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            color: #64748b;
+            font: 900 12px/1 var(--font-ui);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 920px) {
+            .topbar {
+                flex-wrap: wrap;
+            }
+
+            .topbar .spacer { display: none; }
+
+            .topbar a,
+            .topbar button {
+                flex: 1 1 auto;
+                text-align: center;
+            }
+
+            .hero-lab,
+            .case-row,
+            .comparison,
+            .multi-grid,
+            .step-row,
+            .timing-row,
+            .root-lane-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .root-samples,
+            .scroll-strip,
+            .scroll-cluster {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .case-copy {
+                border-right: 0;
+                border-bottom: 1px solid #e1e8f2;
+            }
+
+            .root-scrub {
+                width: min(100%, 126px);
+                justify-self: start;
+            }
+
+            .progress-dial {
+                display: none;
+            }
+
+            .root-scroll-panel {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="topbar" aria-label="Motion test pages">
+        <a href="step-path-torture.html">Step Path Lab</a>
+        <a href="individual-animations.html">Individual</a>
+        <a href="variants.html">Variants</a>
+        <a href="modifiers.html">Modifiers</a>
+        <a href="nested.html">Nested</a>
+        <a href="step-loops.html">Step Loops</a>
+        <a href="scroll-timelines.html" aria-current="page">Scroll Timelines</a>
+        <span class="spacer"></span>
+        <a href="docs.html">Docs</a>
+    </nav>
+
+    <div class="progress-dial motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[0%_100%]">CSS</div>
+
+    <header class="hero">
+        <div class="kicker">Scroll-driven motion lab</div>
+        <h1>Scroll position as the animation clock.</h1>
+        <p class="intro">
+            This page tests `scrub`, `motion-scroll`, range controls, scrub insets, axis modifiers, existing presets, and the old `.wait` trigger side-by-side. Inspect the probe card below: it has `scrub` in the first viewport.
+        </p>
+        <div class="jump-list" id="jump-list"></div>
+        <div class="hero-lab">
+            <div class="probe scrub motion-preset-slide-up-lg" data-motion-probe>
+                <strong>First viewport probe: `scrub motion-preset-slide-up-lg`</strong>
+                <div class="probe-output" data-motion-probe-output>
+                    <span>timeline: checking</span>
+                    <span>range: checking</span>
+                    <span>progress: checking</span>
+                </div>
+            </div>
+            <div class="root-scrub motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[0%_16%]">180</div>
+        </div>
+    </header>
+
+    <main id="sections"></main>
+
+    <script>
+        const sections = [
+            {
+                id: 'basics',
+                label: 'Basics',
+                title: 'Basic Scrub Timeline',
+                intro: 'The smallest useful form is one existing motion class plus `scrub`. No range modifier is required; the default range is intentionally short so it feels like a simple reveal.',
+                cases: [
+                    ['Bare fade', 'scrub motion-preset-fade', 'Minimum preset form. The default scrub range handles the reveal.', '01', 'blue'],
+                    ['Bare slide up', 'scrub motion-preset-slide-up-lg', 'No explicit range. This uses the package default: entry 5% to contain 50%.', '02', 'green'],
+                    ['Bare focus', 'scrub motion-preset-focus-lg', 'Blur and opacity on the default scrub timeline.', '03', 'pink'],
+                    ['Bare pop', 'scrub motion-preset-pop', 'Spring timing still shapes the values; scroll supplies progress.', '04', 'gold'],
+                    ['Bare shrink', 'scrub motion-preset-shrink', 'Scale preset with no extra timeline options.', '05', 'red'],
+                    ['Bare blur up', 'scrub motion-preset-blur-up-lg', 'Translate, blur, and opacity with only `scrub` added.', '06', 'teal'],
+                    ['Bare slide right', 'scrub motion-preset-slide-right-lg', 'Same default timeline, different translate axis.', '07', 'blue'],
+                    ['Primitive translate', 'scrub motion-translate-y-in-100 motion-opacity-in', 'Low-level translate plus opacity also works without a range modifier.', '08', 'green'],
+                    ['Primitive scale', 'scrub motion-scale-in-75 motion-opacity-in', 'Base scale and opacity primitives on the default scrub range.', '09', 'pink'],
+                    ['Primitive rotate', 'scrub motion-rotate-in-180 motion-opacity-in', 'Base rotate and opacity primitives on the default scrub range.', '10', 'gold'],
+                    ['Bare background', 'scrub motion-bg-in-blue-500', 'Color channel with only `scrub` added.', '11', 'red'],
+                    ['Bare text', 'scrub motion-text-in-blue-700', 'Text color channel with only `scrub` added.', '12', 'teal'],
+                ],
+            },
+            {
+                id: 'range-vocabulary',
+                label: 'Range Words',
+                title: 'Range Vocabulary',
+                intro: '`entry`, `cover`, `contain`, and `exit` are browser timeline phases. These rows repeat the same card so the words have a visual meaning instead of being mystery labels.',
+                cases: [
+                    ['Default reveal window', 'scrub motion-preset-slide-up-lg motion-range', 'The package default waits a touch, then finishes around the centered contained moment: entry 5% to contain 50%.', 'DF', 'blue', 'rangeGuide', { left: '5%', width: '55%', color: 'var(--blue)', label: 'entry 5 -> contain 50' }],
+                    ['Entry only', 'scrub motion-preset-slide-up-lg motion-range-entry', 'Starts when the element begins entering and completes by the end of the entry phase.', 'EN', 'green', 'rangeGuide', { left: '0%', width: '25%', color: 'var(--green)', label: 'entry 0 -> entry 100' }],
+                    ['Cover full', 'scrub motion-preset-slide-up-lg motion-range-cover', 'Long cover range. For normal cards this can look very close to full.', 'CV', 'pink', 'rangeGuide', { left: '0%', width: '100%', color: 'var(--pink)', label: 'cover 0 -> cover 100' }],
+                    ['Contain only', 'scrub motion-preset-slide-up-lg motion-range-contain', 'Only advances while the element is fully inside the viewport.', 'CN', 'gold', 'rangeGuide', { left: '30%', width: '40%', color: 'var(--gold)', label: 'contain 0 -> contain 100' }],
+                    ['Exit only', 'scrub motion-preset-slide-up-lg motion-range-exit', 'Mostly changes while the card leaves.', 'EX', 'red', 'rangeGuide', { left: '75%', width: '25%', color: 'var(--red)', label: 'exit 0 -> exit 100' }],
+                    ['Full pass', 'scrub motion-preset-slide-up-lg motion-range-full', 'Entry start through exit finish. Similar to cover-full on many normal card sizes.', 'FL', 'teal', 'rangeGuide', { left: '0%', width: '100%', color: 'var(--teal)', label: 'entry 0 -> exit 100' }],
+                    ['Middle cover slice', 'scrub motion-preset-slide-up-lg motion-range-[cover_25%_cover_75%]', 'A named-range slice: useful when full and cover look too similar.', 'M', 'blue', 'rangeGuide', { left: '25%', width: '50%', color: 'var(--blue)', label: 'cover 25 -> cover 75' }],
+                ],
+            },
+            {
+                id: 'ranges',
+                label: 'Ranges',
+                title: 'Range Presets',
+                intro: 'These are intentionally repetitive. The same slide should finish at different scroll positions depending on the range.',
+                cases: [
+                    ['No explicit range', 'scrub motion-preset-slide-up-lg', 'Uses the package default: entry 5% to contain 50%.', 'D', 'blue'],
+                    ['XS range', 'scrub motion-preset-slide-up-lg motion-range-xs', 'Shortest named range; should snap through quickly.', 'XS', 'green'],
+                    ['Small range', 'scrub motion-preset-slide-up-lg motion-range-sm', 'Finishes quickly, but not as aggressively as xs.', 'SM', 'gold'],
+                    ['Medium range', 'scrub motion-preset-slide-up-lg motion-range-md', 'Equivalent to the default range value.', 'MD', 'pink'],
+                    ['Large range', 'scrub motion-preset-slide-up-lg motion-range-lg', 'Longer reveal window before the card settles.', 'LG', 'teal'],
+                    ['Entry range', 'scrub motion-preset-slide-right-lg motion-range-entry', 'Only the entry phase maps to 0-100%.', 'E', 'red'],
+                    ['Cover range', 'scrub motion-preset-blur-up-lg motion-range-cover', 'Long cover pass. Often close to full for normal card sizes.', 'C', 'blue'],
+                    ['Contain range', 'scrub motion-preset-shrink motion-range-contain', 'Progresses while fully contained. This may feel quiet on tall cards.', 'CN', 'green'],
+                    ['Exit range', 'scrub motion-preset-slide-left-lg motion-range-exit', 'The animation mostly waits until the card leaves.', 'X', 'pink'],
+                    ['Full range', 'scrub motion-preset-slide-down-lg motion-range-full', 'The full enter-to-exit pass.', 'F', 'red'],
+                ],
+            },
+            {
+                id: 'containers',
+                label: 'Containers',
+                title: 'Scroll Container Timelines',
+                intro: '`motion-scroll-nearest` and `motion-scroll-self` are not page scroll. These demos have obvious boxed scroll areas with thick scrollbars; scroll inside the box.',
+                cases: [
+                    ['Nearest rotates children', 'motion-scroll motion-scroll-nearest motion-rotate-out-180 motion-range-[0%_100%]', 'Six children are distributed through the scrollbox and read progress from the nearest scrollable panel.', 'N1', 'blue', 'nearestScroller'],
+                    ['Nearest scales child', 'motion-scroll motion-scroll-nearest motion-scale-out-150 motion-opacity-out-25 motion-range-[0%_100%]', 'Same scrollbox, scale and opacity channels.', 'N2', 'green', 'nearestScroller'],
+                    ['Nearest color child', 'motion-scroll motion-scroll-nearest motion-bg-out-blue-600 motion-text-out-white motion-range-[0%_100%]', 'Color channels tied to the container scroll.', 'N3', 'pink', 'nearestScroller'],
+                    ['Nearest middle range', 'motion-scroll motion-scroll-nearest motion-translate-y-out-100 motion-range-[20%_80%]', 'Container progress from 20% to 80%, not the full box scroll.', 'N4', 'gold', 'nearestScroller'],
+                    ['Self scales panel', 'motion-scroll motion-scroll-self motion-scale-out-110 motion-range-[0%_100%]', 'The scrollable panel itself is the animated element and timeline source.', 'S1', 'teal', 'selfScroller'],
+                    ['Self color panel', 'motion-scroll motion-scroll-self motion-bg-out-slate-900 motion-text-out-white motion-range-[0%_100%]', 'Panel background and text respond to its own scrollTop.', 'S2', 'red', 'selfScroller'],
+                ],
+            },
+            {
+                id: 'arbitrary',
+                label: 'Arbitrary',
+                title: 'Arbitrary Range Values',
+                intro: 'Underscores become spaces for arbitrary range values. These rows are parser tests and behavior tests.',
+                cases: [
+                    ['Fast entry burst', 'scrub motion-preset-pop motion-range-[entry_0%_cover_15%]', 'Completes almost immediately after entering.', 'A1', 'blue'],
+                    ['Late start', 'scrub motion-preset-slide-up-lg motion-range-[entry_20%_cover_60%]', 'Starts after entry has already begun.', 'A2', 'green'],
+                    ['Cover-only fade', 'scrub motion-preset-fade motion-range-[cover_0%_cover_100%]', 'The long cover range spelled explicitly.', 'A3', 'pink'],
+                    ['Full explicit', 'scrub motion-preset-focus-lg motion-range-[entry_0%_exit_100%]', 'Same idea as full, spelled out.', 'A4', 'gold'],
+                    ['Exit range explicit', 'scrub motion-preset-slide-left-lg motion-range-[exit_0%_exit_100%]', 'Mostly changes while leaving.', 'A5', 'red'],
+                    ['Narrow middle', 'scrub motion-preset-expand motion-range-[cover_25%_cover_75%]', 'A middle-window scrub test.', 'A6', 'teal'],
+                    ['Contain middle', 'scrub motion-preset-shrink motion-range-[contain_10%_contain_90%]', 'Only when mostly contained, with trimmed endpoints.', 'A7', 'blue'],
+                    ['Delayed cover start', 'scrub motion-preset-blur-up-lg motion-range-[cover_40%_cover_100%]', 'Waits until a later cover point before changing.', 'A8', 'green'],
+                ],
+            },
+            {
+                id: 'presets',
+                label: 'Presets',
+                title: 'Preset Coverage',
+                intro: 'A broad sweep of existing presets under `scrub`. Loop presets under scroll are intentionally weird because the timeline is no longer time.',
+                cases: [
+                    ['Fade', 'scrub motion-preset-fade motion-range-full', 'Plain opacity preset.', 'FA', 'blue'],
+                    ['Slide up lg', 'scrub motion-preset-slide-up-lg motion-range-full', 'Large vertical translate.', 'SU', 'green'],
+                    ['Slide right lg', 'scrub motion-preset-slide-right-lg motion-range-full', 'Large horizontal translate.', 'SR', 'pink'],
+                    ['Slide down left', 'scrub motion-preset-slide-down-left-lg motion-range-full', 'Diagonal translate preset.', 'DL', 'gold'],
+                    ['Focus lg', 'scrub motion-preset-focus-lg motion-range-full', 'Blur and opacity.', 'FO', 'red'],
+                    ['Blur right', 'scrub motion-preset-blur-right-lg motion-range-full', 'Directional blur preset.', 'BR', 'teal'],
+                    ['Rebound right', 'scrub motion-preset-rebound-right motion-range-full', 'Springy translate on a view timeline.', 'R1', 'blue'],
+                    ['Rebound down', 'scrub motion-preset-rebound-down motion-range-full', 'Same family, different direction.', 'RD', 'green'],
+                    ['Bounce', 'scrub motion-preset-bounce motion-range-full', 'Bounce easing becomes scroll-shaped interpolation.', 'B', 'pink'],
+                    ['Compress', 'scrub motion-preset-compress motion-range-full', 'Scale from larger to normal.', 'CP', 'gold'],
+                    ['Confetti preset flag', 'scrub motion-preset-confetti motion-range-full', 'Current preset behaves like transform motion here; no particle confetti renders.', 'CF', 'red'],
+                    ['Wiggle', 'scrub motion-preset-wiggle motion-range-full', 'Rotate and translate together.', 'W', 'teal'],
+                    ['Pulse loop as scrub', 'scrub motion-preset-pulse-sm motion-range-full', 'Loop preset on a view timeline.', 'P', 'blue'],
+                    ['Wobble loop as scrub', 'scrub motion-preset-wobble-sm motion-range-full', 'Loop translate and rotate scrub.', 'WB', 'green'],
+                    ['Float loop as scrub', 'scrub motion-preset-float-sm motion-range-full', 'Loop translate under view progress.', 'FL', 'pink'],
+                    ['Spin loop as scrub', 'scrub motion-preset-spin motion-range-full', 'Looping rotate under view progress.', 'SP', 'gold'],
+                ],
+            },
+            {
+                id: 'loops',
+                label: 'Loops',
+                title: 'Loop Scrub Torture',
+                intro: 'Scroll timelines scrub loop animations as finite cycles by default. These rows brute-force loop presets, base loop utilities, color loops, and explicit loop counts.',
+                cases: [
+                    ['Pulse once', 'scrub motion-preset-pulse-lg motion-range-full', 'Default timeline loop count is one scrubbed cycle.', 'P1', 'blue'],
+                    ['Pulse twice', 'scrub motion-preset-pulse-lg motion-loop-twice motion-range-full', 'Explicit loop count override: two cycles over the same view range.', 'P2', 'green'],
+                    ['Wobble once', 'scrub motion-preset-wobble-lg motion-range-full', 'Translate loop mirror should visibly hit the middle keyframe.', 'W1', 'pink'],
+                    ['Wobble twice', 'scrub motion-preset-wobble-lg motion-loop-twice motion-range-full', 'Same loop preset, two scrubbed cycles.', 'W2', 'gold'],
+                    ['Float once', 'scrub motion-preset-float-lg motion-range-full', 'Longer preset duration should still scrub.', 'F1', 'red'],
+                    ['Spin once', 'scrub motion-preset-spin motion-range-full', 'Reset loop should rotate from 0 to 360 across the range.', 'S1', 'teal'],
+                    ['Spin twice', 'scrub motion-preset-spin motion-loop-twice motion-range-full', 'Two rotations across the same range.', 'S2', 'blue'],
+                    ['Scale loop', 'scrub motion-scale-loop-150 motion-range-full', 'Base scale loop using the default loop shape.', 'SL', 'green'],
+                    ['Scale loop twice', 'scrub motion-scale-loop-150 motion-loop-twice motion-range-full', 'Same scale loop, two scrubbed cycles.', 'S2', 'pink'],
+                    ['Translate loop', 'scrub motion-translate-y-loop-100 motion-range-full', 'Base translate loop using the default loop shape.', 'TY', 'gold'],
+                    ['Translate loop twice', 'scrub motion-translate-y-loop-100 motion-loop-twice motion-range-full', 'Same translate loop, two scrubbed cycles.', 'T2', 'red'],
+                    ['Rotate loop', 'scrub motion-rotate-loop-180 motion-range-full', 'Base rotate loop using the default loop shape.', 'RM', 'teal'],
+                    ['Rotate loop twice', 'scrub motion-rotate-loop-180 motion-loop-twice motion-range-full', 'Same rotate loop, two scrubbed cycles.', 'R2', 'blue'],
+                    ['Opacity loop', 'scrub motion-opacity-loop-25 motion-range-full', 'Opacity loop should fade down at midrange and recover.', 'OP', 'green'],
+                    ['Background loop', 'scrub motion-bg-loop-blue-600 motion-range-full', 'Background color loop under a view timeline.', 'BG', 'pink'],
+                    ['Text loop', 'scrub motion-text-loop-red-700 motion-range-full', 'Text color loop under a view timeline.', 'TX', 'gold'],
+                ],
+            },
+            {
+                id: 'base',
+                label: 'Base',
+                title: 'Base Utility Coverage',
+                intro: 'The lower-level animation primitives should work too, not just presets.',
+                cases: [
+                    ['Translate Y in', 'scrub motion-translate-y-in-100 motion-opacity-in motion-range-full', 'Base translate plus base opacity.', 'TY', 'blue'],
+                    ['Translate X out', 'scrub motion-translate-x-out-100 motion-opacity-out motion-range-full', 'Exit animation scrubbed by view progress.', 'TX', 'green'],
+                    ['Translate loop', 'scrub motion-translate-y-loop-50 motion-range-full', 'Loop translate primitive under view progress.', 'TL', 'pink'],
+                    ['Rotate in', 'scrub motion-rotate-in-180 motion-opacity-in motion-range-full', 'Rotate-in primitive.', 'RI', 'gold'],
+                    ['Rotate out', 'scrub motion-rotate-out-180 motion-range-full', 'Rotate-out primitive.', 'RO', 'red'],
+                    ['Rotate loop', 'scrub motion-rotate-loop-90 motion-range-full', 'Looping rotate primitive under view progress.', 'RL', 'teal'],
+                    ['Scale in 50', 'scrub motion-scale-in-50 motion-opacity-in motion-range-full', 'Scale primitive from small to normal.', 'S50', 'blue'],
+                    ['Scale out 150', 'scrub motion-scale-out-150 motion-opacity-out-50 motion-range-full', 'Scale primitive from normal to large.', 'S150', 'green'],
+                    ['Scale loop', 'scrub motion-scale-loop-125 motion-range-full', 'Looping scale primitive under view progress.', 'SL', 'pink'],
+                    ['Blur in xl', 'scrub motion-blur-in-xl motion-opacity-in motion-range-full', 'Filter animation under view progress.', 'BI', 'gold'],
+                    ['Blur out 2xl', 'scrub motion-blur-out-2xl motion-range-full', 'Exit blur primitive.', 'BO', 'red'],
+                    ['Grayscale in', 'scrub motion-grayscale-in-100 motion-range-full', 'Filter channel grayscale-in primitive.', 'GI', 'teal'],
+                    ['Grayscale out', 'scrub motion-grayscale-out-100 motion-range-full', 'Filter exit values under view progress.', 'GO', 'blue'],
+                    ['Opacity loop', 'scrub motion-opacity-loop-25 motion-range-full', 'Opacity loop under scroll progress.', 'OL', 'green'],
+                ],
+            },
+            {
+                id: 'colors',
+                label: 'Colors',
+                title: 'Color Channels',
+                intro: 'Background and text color channels need separate coverage because they are easy to break when animation shorthand order changes.',
+                cases: [
+                    ['Background in blue', 'scrub motion-bg-in-blue-500 motion-range-full', 'Background animates from blue to the normal card background.', 'B1', 'blue'],
+                    ['Background out red', 'scrub motion-bg-out-red-500 motion-range-full', 'Background animates toward red while passing.', 'R1', 'red'],
+                    ['Background loop green', 'scrub motion-bg-loop-green-500 motion-range-full', 'Looping background color scrub.', 'G1', 'green'],
+                    ['Text in blue', 'scrub motion-text-in-blue-700 motion-range-full', 'Text color starts blue and resolves.', 'T1', 'blue'],
+                    ['Text out red', 'scrub motion-text-out-red-700 motion-range-full', 'Text color ends red.', 'T2', 'red'],
+                    ['Text loop gold', 'scrub motion-text-loop-yellow-600 motion-range-full', 'Looping text color scrub.', 'T3', 'gold'],
+                    ['Background and text', 'scrub motion-bg-out-slate-900 motion-text-out-white motion-range-full', 'Two color channels together.', 'BT', 'pink'],
+                    ['Color with slide', 'scrub motion-preset-slide-up-lg motion-bg-out-blue-600 motion-text-out-white motion-range-full', 'Preset plus color channels.', 'CS', 'teal'],
+                    ['Color with delay', 'scrub motion-bg-out-red-500 motion-delay-300/background motion-range-full', 'Background channel has a delayed start inside the scroll range.', 'CD', 'red'],
+                    ['Color with ease', 'scrub motion-bg-out-green-600 motion-ease-spring-smooth/background motion-range-full', 'Targeted easing for background channel.', 'CE', 'green'],
+                ],
+            },
+            {
+                id: 'timing',
+                label: 'Timing',
+                title: 'Duration And Delay Timeline Lab',
+                intro: 'Duration and delay do not start a clock anymore; they shape where each channel lands inside the scroll range. These grouped demos compare nearly identical classes side by side.',
+                cases: [
+                    ['Local duration scrubber', 'motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-duration-75 motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-duration-2000 motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-duration-[4000ms] motion-range-[0%_100%]', 'Scroll inside the box. Short duration finishes early; long duration spends more of the same scroll range interpolating.', 'LD', 'blue', 'timingScrollbox', { labels: ['75ms', '750ms', '2000ms', '4000ms'] }],
+                    ['Local delay scrubber', 'motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-delay-300 motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-delay-1000 motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-delay-[1800ms] motion-range-[0%_100%]', 'Same local scrollbox clock. Big delays make the card sit at the starting value for more of the scroll.', 'DL', 'green', 'timingScrollbox', { labels: ['none', '300ms', '1000ms', '1800ms'] }],
+                    ['Short range plus delay', 'motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-range-[0%_35%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-delay-700 motion-range-[0%_35%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-range-[35%_100%] || motion-scroll motion-scroll-nearest motion-preset-slide-up-lg motion-delay-700 motion-range-[35%_100%]', 'Short and late ranges make delay much easier to see than a full document view range.', 'SR', 'pink', 'timingScrollbox', { labels: ['0-35', '0-35 delay', '35-100', '35-100 delay'] }],
+                    ['Targeted local delays', 'motion-scroll motion-scroll-nearest motion-preset-focus-lg motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-focus-lg motion-delay-1000/translate motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-focus-lg motion-delay-1000/opacity motion-range-[0%_100%] || motion-scroll motion-scroll-nearest motion-preset-focus-lg motion-delay-1000/blur motion-range-[0%_100%]', 'Only one channel waits in each delayed card, which is easier to diagnose in a local scrollbox.', 'TD', 'gold', 'timingScrollbox', { labels: ['none', 'translate', 'opacity', 'blur'] }],
+                    ['Duration comparison', 'scrub motion-preset-slide-up-lg motion-range-full || scrub motion-preset-slide-up-lg motion-duration-200 motion-range-full || scrub motion-preset-slide-up-lg motion-duration-1000 motion-range-full || scrub motion-preset-slide-up-lg motion-duration-2000 motion-range-full', 'Same preset and range; only duration changes.', 'DU', 'blue', 'multiGrid', { labels: ['default', '200ms', '1000ms', '2000ms'] }],
+                    ['Delay comparison', 'scrub motion-preset-slide-up-lg motion-range-full || scrub motion-preset-slide-up-lg motion-delay-150 motion-range-full || scrub motion-preset-slide-up-lg motion-delay-300 motion-range-full || scrub motion-preset-slide-up-lg motion-delay-700 motion-range-full', 'Same preset and range; only delay changes.', 'DL', 'green', 'multiGrid', { labels: ['none', '150ms', '300ms', '700ms'] }],
+                    ['Targeted delay', 'scrub motion-preset-slide-up-lg motion-range-full || scrub motion-preset-slide-up-lg motion-delay-300/translate motion-range-full || scrub motion-preset-slide-up-lg motion-delay-300/opacity motion-range-full || scrub motion-preset-slide-up-lg motion-delay-300/blur motion-range-full', 'Only one animation family gets delayed.', 'TD', 'pink', 'multiGrid', { labels: ['none', 'translate', 'opacity', 'blur'] }],
+                    ['Targeted duration', 'scrub motion-preset-focus-lg motion-range-full || scrub motion-preset-focus-lg motion-duration-1500/blur motion-range-full || scrub motion-preset-focus-lg motion-duration-1500/opacity motion-range-full || scrub motion-preset-focus-lg motion-duration-1500/translate motion-range-full', 'Targeted duration with a multi-channel preset.', 'TF', 'gold', 'multiGrid', { labels: ['default', 'blur', 'opacity', 'translate'] }],
+                    ['Easing comparison', 'scrub motion-preset-slide-up-lg motion-ease-linear motion-range-full || scrub motion-preset-slide-up-lg motion-ease-out-quart motion-range-full || scrub motion-preset-slide-up-lg motion-ease-spring-snappy motion-range-full || scrub motion-preset-slide-up-lg motion-ease-spring-bounciest motion-range-full', 'Same range, different easing curves.', 'EZ', 'red', 'multiGrid', { labels: ['linear', 'out quart', 'snappy', 'bounciest'] }],
+                    ['Range plus delay', 'scrub motion-preset-slide-up-lg motion-range-sm || scrub motion-preset-slide-up-lg motion-delay-300 motion-range-sm || scrub motion-preset-slide-up-lg motion-range-full || scrub motion-preset-slide-up-lg motion-delay-300 motion-range-full', 'Delay is much more obvious in a short range than a full pass.', 'RD', 'teal', 'multiGrid', { labels: ['sm', 'sm delay', 'full', 'full delay'] }],
+                ],
+            },
+            {
+                id: 'variants-timeline',
+                label: 'Variants',
+                title: 'Variants With Timelines',
+                intro: 'Variants decide when the animation exists. The scroll timeline decides the progress value once that variant is active.',
+                cases: [
+                    ['Hover focus peer', 'scrub group-hover:motion-preset-pop motion-range-full || scrub focus:motion-preset-slide-up-lg motion-range-full || scrub peer-checked:motion-preset-expand motion-range-full', 'Hover the bordered group, focus the button, and toggle the peer control.', 'V1', 'blue', 'variantGrid'],
+                    ['Variant colors', 'scrub group-hover:motion-bg-out-blue-600 group-hover:motion-text-out-white motion-range-full || scrub focus:motion-bg-out-green-600 focus:motion-text-out-white motion-range-full || scrub peer-checked:motion-bg-out-red-600 peer-checked:motion-text-out-white motion-range-full', 'Color channels under group, focus, and peer variants.', 'V2', 'green', 'variantGrid'],
+                    ['Variant loops', 'scrub group-hover:motion-preset-pulse-lg motion-range-full || scrub focus:motion-preset-spin motion-range-full || scrub peer-checked:motion-preset-wobble-lg motion-range-full', 'Loop presets under active variants should scrub once by default.', 'V3', 'pink', 'variantGrid'],
+                    ['Variant delay', 'scrub group-hover:motion-preset-slide-up-lg group-hover:motion-delay-300 motion-range-full || scrub focus:motion-preset-slide-right-lg focus:motion-delay-300 motion-range-full || scrub peer-checked:motion-preset-focus-lg peer-checked:motion-delay-300 motion-range-full', 'Delay modifiers scoped through variants.', 'V4', 'gold', 'variantGrid'],
+                ],
+            },
+            {
+                id: 'steps-timeline',
+                label: 'Steps',
+                title: 'Step Logic With Timelines',
+                intro: 'Step classes still build chained delays. The common model is a group-owned scrub timeline: put `scrub-group` on `motion-group`, then let children declare only their step classes. The first block below intentionally stays boring and default.',
+                cases: [
+                    ['Default two-step group', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-fade', 'Smallest common step timeline. One group owns the scrub timeline; two children only declare step classes.', '2', 'blue', 'stepTimeline', { labels: ['step 1', 'step 2'], columns: 2, layout: 'compact' }],
+                    ['Default three-step group', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-fade', 'The normal reveal stack: enter, accent, settle. No explicit range modifier.', '3', 'green', 'stepTimeline', { labels: ['step 1', 'step 2', 'step 3'], columns: 3 }],
+                    ['Default four-step group', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Recommended baseline. The group owns `entry 5% contain 50%`; children only declare steps.', '4', 'pink', 'stepTimeline', { labels: ['step 1', 'step 2', 'step 3', 'step 4'] }],
+                    ['Default five-step group', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus || step-5:motion-preset-fade', 'Same default clock, more children. This checks that later step slots inherit the group timeline cleanly.', '5', 'gold', 'stepTimeline', { labels: ['step 1', 'step 2', 'step 3', 'step 4', 'step 5'], columns: 5, layout: 'dense' }],
+                    ['Default six-step group', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus || step-5:motion-preset-expand || step-6:motion-preset-fade', 'Six steps in two visual rows. This is mostly a readability and generated-selector test.', '6', 'teal', 'stepTimeline', { labels: ['one', 'two', 'three', 'four', 'five', 'six'], columns: 3, layout: 'wide' }],
+                    ['Default compact cards', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-focus', 'Compact layout, same default group timeline. Useful for dense UI lists.', 'CP', 'blue', 'stepTimeline', { labels: ['compact 1', 'compact 2', 'compact 3'], columns: 3, layout: 'compact' }],
+                    ['Default tall cards', 'motion-group scrub-group || step-1:motion-preset-slide-up-lg || step-2:motion-preset-pop || step-3:motion-preset-focus-lg', 'Tall content should not force child-owned timelines. The group is still the trigger and scrub window.', 'TL', 'green', 'stepTimeline', { labels: ['tall 1', 'tall 2', 'tall 3'], columns: 3, layout: 'tall' }],
+                    ['Default wide row', 'motion-group scrub-group || step-1:motion-preset-slide-left-lg || step-2:motion-preset-pop || step-3:motion-preset-slide-right-lg', 'A wide layout with left, center, and right motion, still using the default group range.', 'WD', 'pink', 'stepTimeline', { labels: ['left', 'center', 'right'], columns: 3, layout: 'wide' }],
+                    ['Default mixed presets', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-rebound-right || step-3:motion-preset-focus || step-4:motion-preset-compress || step-5:motion-preset-wiggle', 'Multiple preset families should all read the same group scrub timeline.', 'MX', 'gold', 'stepTimeline', { labels: ['slide', 'rebound', 'focus', 'compress', 'wiggle'], columns: 5, layout: 'dense' }],
+                    ['Default primitive transforms', 'motion-group scrub-group || step-1:motion-translate-y-in-100 step-1:motion-opacity-in || step-2:motion-scale-in-75 step-2:motion-opacity-in || step-3:motion-rotate-in-180 step-3:motion-opacity-in || step-4:motion-blur-in-lg step-4:motion-opacity-in', 'Low-level transform, filter, and opacity utilities should behave the same as presets.', 'PR', 'red', 'stepTimeline', { labels: ['translate', 'scale', 'rotate', 'blur'] }],
+                    ['Default color steps', 'motion-group scrub-group || step-1:motion-bg-out-blue-600 step-1:motion-text-out-white || step-2:motion-bg-out-green-600 step-2:motion-text-out-white || step-3:motion-bg-out-red-600 step-3:motion-text-out-white || step-4:motion-bg-out-slate-900 step-4:motion-text-out-white', 'Color channels do not need child `scrub`; the group timeline should bind the step children.', 'CO', 'teal', 'stepTimeline', { labels: ['blue', 'green', 'red', 'slate'] }],
+                    ['Default duration shaping', 'motion-group scrub-group || step-1:motion-duration-200 step-1:motion-preset-slide-up || step-2:motion-duration-700 step-2:motion-preset-pop || step-3:motion-duration-1200 step-3:motion-preset-slide-right || step-4:motion-duration-[1800ms] step-4:motion-preset-focus', 'Durations shape each step inside the same default group timeline. The clock is still scroll progress.', 'DU', 'blue', 'stepTimeline', { labels: ['200ms', '700ms', '1200ms', '1800ms'] }],
+                    ['Default group gap', 'motion-group scrub-group motion-gap-300 || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'A group-level gap spaces the normal step chain without adding child timelines or explicit ranges.', 'GP', 'green', 'stepTimeline', { labels: ['gap 1', 'gap 2', 'gap 3', 'gap 4'] }],
+                    ['Default group overlap', 'motion-group scrub-group motion-overlap-200 || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'A group-level overlap compresses the normal step chain while preserving the default scrub timeline.', 'OV', 'pink', 'stepTimeline', { labels: ['overlap 1', 'overlap 2', 'overlap 3', 'overlap 4'] }],
+                    ['Range default control', 'motion-group scrub-group || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Control row for the range-size comparisons below. This is the same default as the recommended baseline.', 'DF', 'blue', 'stepTimeline', { labels: ['default 1', 'default 2', 'default 3', 'default 4'] }],
+                    ['Range xs group', 'motion-group scrub-group motion-range-xs || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Fastest named group range. The whole sequence completes during entry.', 'XS', 'green', 'stepTimeline', { labels: ['xs 1', 'xs 2', 'xs 3', 'xs 4'] }],
+                    ['Range sm group', 'motion-group scrub-group motion-range-sm || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Short group range. Useful when the sequence should feel close to a reveal.', 'SM', 'gold', 'stepTimeline', { labels: ['sm 1', 'sm 2', 'sm 3', 'sm 4'] }],
+                    ['Range md group', 'motion-group scrub-group motion-range-md || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Medium is equivalent to the default range, but explicit.', 'MD', 'pink', 'stepTimeline', { labels: ['md 1', 'md 2', 'md 3', 'md 4'] }],
+                    ['Range lg group', 'motion-group scrub-group motion-range-lg || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Longer group range. Later steps have more room before the group settles.', 'LG', 'teal', 'stepTimeline', { labels: ['lg 1', 'lg 2', 'lg 3', 'lg 4'] }],
+                    ['Range contain group', 'motion-group scrub-group motion-range-contain || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Only progresses while the group is fully contained. This makes the sequence feel centered and deliberate.', 'CN', 'red', 'stepTimeline', { labels: ['contain 1', 'contain 2', 'contain 3', 'contain 4'] }],
+                    ['Range full group', 'motion-group scrub-group motion-range-full || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Longest useful group scrub range. The whole sequence stretches from entry through exit.', 'FL', 'blue', 'stepTimeline', { labels: ['full 1', 'full 2', 'full 3', 'full 4'] }],
+                    ['Local step scrubber', 'motion-group motion-scroll-group motion-range-[0%_100%] || step-1:motion-preset-slide-up || step-2:motion-preset-pop || step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'Scroll inside the box. The scrollbox owns the named timeline, and `motion-range` lives on the group.', 'LS', 'blue', 'stepScrollbox', { labels: ['step 1', 'step 2', 'step 3', 'step 4'] }],
+                    ['Local sparse steps', 'motion-group motion-scroll-group motion-range-[0%_100%] || step-1:motion-preset-slide-up || step-3:motion-preset-slide-right || step-5:motion-preset-expand', 'Empty step slots should not create dead space; only active step slots contribute to the chain.', 'SP', 'green', 'stepScrollbox', { labels: ['step 1', 'step 3', 'step 5'] }],
+                    ['Local gap and overlap', 'motion-group motion-scroll-group motion-range-[0%_100%] || step-1:motion-duration-1000 step-1:motion-preset-slide-up || step-2:motion-gap-700 step-2:motion-preset-pop || step-3:motion-overlap-500 step-3:motion-preset-slide-right || step-4:motion-preset-focus', 'The second step starts later because of gap; the third starts earlier because of overlap.', 'GO', 'pink', 'stepScrollbox', { labels: ['long 1', 'gap 2', 'overlap 3', 'step 4'] }],
+                    ['Local step colors and loops', 'motion-group motion-scroll-group motion-range-[0%_100%] || step-1:motion-bg-out-blue-600 step-1:motion-text-out-white || step-2:motion-preset-pulse-lg || step-3:motion-bg-out-red-600 step-3:motion-text-out-white || step-4:motion-preset-spin', 'Color channels and loop presets use the same local scrubbed step chain.', 'CL', 'gold', 'stepScrollbox', { labels: ['blue', 'pulse', 'red', 'spin'] }],
+                    ['Per-child scrub comparison', 'motion-group || scrub step-1:motion-preset-slide-up motion-range-full || scrub step-2:motion-preset-pop motion-range-full || scrub step-3:motion-preset-slide-down motion-range-full || scrub step-4:motion-preset-fade motion-range-full', 'Older child-owned model. Useful as a comparison, but group-owned timelines above are the clean path.', 'CV', 'blue', 'stepTimeline', { labels: ['child 1', 'child 2', 'child 3', 'child 4'] }],
+                    ['Per-child mixed ranges', 'motion-group || scrub step-1:motion-preset-slide-up motion-range-sm || scrub step-2:motion-preset-pop motion-range-md || scrub step-3:motion-preset-slide-right motion-range-lg || scrub step-4:motion-preset-focus motion-range-full', 'Each child can own a different scrub range, which is powerful but harder to reason about than one group clock.', 'MR', 'green', 'stepTimeline', { labels: ['sm', 'md', 'lg', 'full'] }],
+                    ['Per-child loops', 'motion-group || scrub step-1:motion-preset-pulse-lg motion-range-full || scrub step-2:motion-preset-spin motion-range-full || scrub step-3:motion-preset-wobble-lg motion-range-full || scrub step-4:motion-preset-float-lg motion-range-full', 'Loop presets inside child-owned step timelines scrub as finite cycles.', 'CL', 'gold', 'stepTimeline', { labels: ['pulse', 'spin', 'wobble', 'float'] }],
+                ],
+            },
+            {
+                id: 'modifiers',
+                label: 'Modifiers',
+                title: 'Modifiers With Scroll Timelines',
+                intro: 'Duration no longer advances the clock, but duration, delay, easing, and targeted channel modifiers still shape each animation channel inside the scroll range.',
+                cases: [
+                    ['Linear slide', 'scrub motion-preset-slide-up-lg motion-ease-linear motion-range-full', 'A plain linear scrub.', 'L', 'blue'],
+                    ['Out quart slide', 'scrub motion-preset-slide-up-lg motion-ease-out-quart motion-range-full', 'Easing changes how scroll progress maps to value.', 'OQ', 'green'],
+                    ['Spring bouncy slide', 'scrub motion-preset-slide-up-lg motion-ease-spring-bouncy motion-range-full', 'Spring curve under scroll progress.', 'SB', 'pink'],
+                    ['Spring snappy slide', 'scrub motion-preset-slide-up-lg motion-ease-spring-snappy motion-range-full', 'Different spring timing.', 'SN', 'gold'],
+                    ['Duration 200', 'scrub motion-preset-slide-up-lg motion-duration-200 motion-range-full', 'Short duration compresses interpolation inside the scroll range.', 'D2', 'red'],
+                    ['Duration 1000', 'scrub motion-preset-slide-up-lg motion-duration-1000 motion-range-full', 'Long duration changes channel composition under scroll.', 'D10', 'teal'],
+                    ['Delay 300', 'scrub motion-preset-slide-up-lg motion-delay-300 motion-range-full', 'Delay shifts the active part of the animation within the range.', 'DL', 'blue'],
+                    ['Delay translate only', 'scrub motion-preset-slide-up-lg motion-delay-300/translate motion-range-full', 'Only translate waits; opacity can move earlier.', 'DT', 'green'],
+                    ['Delay opacity only', 'scrub motion-preset-slide-up-lg motion-delay-300/opacity motion-range-full', 'Only opacity waits; translate can move earlier.', 'DO', 'pink'],
+                    ['Opacity targeted ease', 'scrub motion-preset-slide-up-lg motion-ease-linear/opacity motion-range-full', 'Only opacity timing is targeted.', 'OP', 'gold'],
+                    ['Translate targeted ease', 'scrub motion-preset-slide-up-lg motion-ease-spring-bouncier/translate motion-range-full', 'Only translate timing is targeted.', 'TR', 'red'],
+                    ['Blur targeted duration', 'scrub motion-preset-focus-lg motion-duration-1000/blur motion-range-full', 'The filter channel uses a different duration.', 'BD', 'teal'],
+                ],
+            },
+            {
+                id: 'view-options',
+                label: 'Scrub Options',
+                title: 'Scrub Insets And Axis',
+                intro: 'Insets are the practical option. Axis utilities exist for syntax coverage, but block axis is the normal viewport-scroll case.',
+                cases: [
+                    ['Default scrub', 'scrub motion-preset-slide-up-lg motion-range-full', 'Default view() timeline under the `scrub` name.', 'V', 'blue'],
+                    ['Block axis explicit', 'scrub scrub-axis-block motion-preset-slide-up-lg motion-range-full', 'Same as default, but explicit.', 'B', 'green'],
+                    ['Y axis explicit', 'scrub scrub-axis-y motion-preset-slide-up-lg motion-range-full', 'Physical y axis spelling.', 'Y', 'pink'],
+                    ['Inset 20 percent', 'scrub scrub-inset-[20%] motion-preset-slide-up-lg motion-range-full', 'The view range is measured against an inset viewport.', '20', 'gold'],
+                    ['Inset 10 and 25', 'scrub scrub-inset-[10%_25%] motion-preset-focus-lg motion-range-full', 'Two-value inset syntax.', '10', 'red'],
+                    ['Inset auto', 'scrub scrub-inset motion-preset-blur-up-lg motion-range-full', 'Explicit auto inset sanity check.', 'AU', 'teal'],
+                    ['Inset with cover', 'scrub scrub-inset-[15%] motion-preset-pop motion-range-cover', 'Inset changes how the cover range feels.', 'IC', 'blue'],
+                    ['Inset with contain', 'scrub scrub-inset-[15%] motion-preset-shrink motion-range-contain', 'Contain plus inset is a stricter active window.', 'IN', 'green'],
+                ],
+            },
+            {
+                id: 'scroll-root',
+                label: 'Advanced Root',
+                title: 'Advanced Root Scroll Diagnostics',
+                intro: '`motion-scroll-root` is a global document progress clock. It is useful for page-level progress effects, not normal card reveals. Skip this unless you specifically want every item to read the same page scroll position.',
+                cases: [
+                    ['Root sticky scrub rig', 'motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[0%_100%] || motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[var(--root-window-start)_var(--root-window-end)] || motion-scroll motion-scroll-root motion-scale-out-150 motion-opacity-out-25 motion-range-[var(--root-window-mid-start)_var(--root-window-mid-end)] || motion-scroll motion-scroll-root motion-translate-y-out-100 motion-opacity-out-0 motion-range-[var(--root-window-late-start)_var(--root-window-late-end)]', 'The first tile reads the entire document. The other three are windowed to this section so they visibly scrub while this section is on screen.', 'RT', 'blue', 'rootScrubLab', { labels: ['page 0-100', 'section window', 'middle window', 'late window'] }],
+                    ['Full document range', 'motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[0%_100%]', 'This is correct but intentionally slow on a huge page. It can look almost frozen until you scroll a lot.', '100', 'red', 'rootWindow'],
+                    ['Section calibrated rotate', 'motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[var(--root-window-start)_var(--root-window-end)]', 'Same root timeline, but the range is squeezed to this section with measured CSS variables.', 'RW', 'blue', 'rootWindow'],
+                    ['Section calibrated scale and fade', 'motion-scroll motion-scroll-root motion-scale-out-150 motion-opacity-out-25 motion-range-[var(--root-window-start)_var(--root-window-end)]', 'Different channels, same calibrated root window.', 'SF', 'green', 'rootWindow'],
+                    ['Middle section color', 'motion-scroll motion-scroll-root motion-bg-out-blue-600 motion-text-out-white motion-range-[var(--root-window-mid-start)_var(--root-window-mid-end)]', 'A later local root window using color channels.', 'CO', 'pink', 'rootWindow'],
+                    ['Late section slide', 'motion-scroll motion-scroll-root motion-translate-y-out-100 motion-opacity-out-0 motion-range-[var(--root-window-late-start)_var(--root-window-late-end)]', 'This should wait until later in the section because its root range starts later.', 'LY', 'gold', 'rootWindow'],
+                ],
+            },
+            {
+                id: 'wait-modes',
+                label: 'Modes',
+                title: 'Wait Vs Scrub Modes',
+                intro: 'There are only two models here: `wait` is the JS one-shot trigger, and `scrub` is the CSS scroll scrub. No middle mode, no approximation.',
+                cases: [
+                    ['JS wait trigger', 'wait motion-preset-slide-up-lg motion-duration-700', 'True one-shot. JS removes `wait`, then normal time-based animation plays and stays done.', 'JW', 'pink', 'waitCard'],
+                    ['JS wait with steps', 'wait motion-group step-1:motion-preset-slide-up step-2:motion-preset-pop step-3:motion-preset-focus', 'Same existing wait behavior on a group: paused until observed, then the normal time-based step sequence plays once.', 'WG', 'blue', 'waitGroup'],
+                    ['CSS scroll scrub', 'scrub motion-preset-slide-up-lg motion-range-full', 'The honest scroll behavior: viewport progress drives animation progress and rewinds on backscroll.', 'SC', 'gold'],
+                    ['CSS scroll default', 'scrub motion-preset-pop', 'Default `scrub` range, still reversible because scroll position is the clock.', 'SD', 'green'],
+                ],
+            },
+            {
+                id: 'wait',
+                label: 'Wait',
+                title: 'Wait Trigger Vs Scrub',
+                intro: '`wait` remains the one-shot JS-triggered reveal path. `scrub` is scroll-linked and reversible. These rows keep the two models separate.',
+                cases: [
+                    ['Side by side comparison', 'wait motion-preset-slide-up-lg motion-duration-700 || scrub motion-preset-slide-up-lg motion-range-full', 'Left is paused until observed. Right is always driven by view progress.', 'JS', 'pink', 'comparison'],
+                    ['Wait parent with children', 'wait motion-group step-1:motion-preset-slide-up step-2:motion-preset-pop step-3:motion-preset-slide-down', 'Parent wait pauses child step animations until the observer removes wait.', 'WG', 'blue', 'waitGroup'],
+                    ['Wait fade', 'wait motion-preset-fade motion-duration-1000', 'Plain one-shot fade trigger. It should not rewind on reverse scroll.', 'WF', 'green', 'waitCard'],
+                    ['Wait delayed slide', 'wait motion-preset-slide-up-lg motion-delay-300 motion-duration-1000', 'Delay is normal time delay after the wait class is removed.', 'WD', 'gold', 'waitCard'],
+                    ['Wait color', 'wait motion-bg-out-blue-600 motion-text-out-white motion-duration-1000', 'Color channels should still work with wait.', 'WC', 'red', 'waitCard'],
+                    ['Scrub substitute', 'scrub motion-preset-slide-up-lg motion-range-full', 'Looks similar on the way in, but scroll owns progress and it rewinds.', 'VS', 'teal'],
+                    ['Scrub with delay', 'scrub motion-preset-slide-up-lg motion-delay-300 motion-range-full', 'Delay is a scroll-range offset, not an observer trigger.', 'VD', 'blue'],
+                ],
+            },
+        ];
+
+        const tokenKind = (token) => {
+            if (/^(scrub|motion-view|motion-scroll|scrub-axis|motion-view-axis|scrub-inset|motion-view-inset|motion-scroll-root|motion-scroll-nearest|motion-scroll-self)/.test(token)) return 'timeline';
+            if (/^motion-range/.test(token)) return 'range';
+            if (/^motion-preset/.test(token)) return 'preset';
+            if (/^(motion-ease|motion-delay|motion-duration|motion-loop)/.test(token)) return 'modifier';
+            if (/^(wait|still|pause|play|motion-group|step-)/.test(token)) return 'state';
+            if (/^(motion-bg|motion-text)/.test(token)) return 'state';
+            return 'utility';
+        };
+
+        const highlight = (text) => text
+            .split(/(\s+|\|\|)/)
+            .map((part) => {
+                if (!part.trim()) return part;
+                if (part === '||') return '<span class="class-token">||</span>';
+                return `<span class="class-token class-token--${tokenKind(part)}">${part}</span>`;
+            })
+            .join('');
+
+        const prettyCode = (classes) => {
+            if (classes.includes('||')) {
+                return classes.split('||')
+                    .map((value) => value.trim())
+                    .map((value, index) => `${index ? `<div>${highlight('||')}</div>` : ''}<div>${highlight(value)}</div>`)
+                    .join('');
+            }
+            return highlight(classes);
+        };
+
+        const stageMarkup = (item, index) => {
+            const [title, classes, note, mark, color, type, meta = {}] = item;
+            if (type === 'comparison') {
+                const [left, right] = classes.split('||').map((value) => value.trim());
+                return `
+                    <div class="comparison" data-unwait-demo>
+                        <div class="demo-card ${left}" data-wait-target>
+                            <span class="demo-token demo-token--${color}">${mark}</span>
+                            <div><h3>Wait trigger</h3><p>One-shot reveal.</p></div>
+                        </div>
+                        <div class="demo-card ${right}">
+                            <span class="demo-token demo-token--blue">CSS</span>
+                            <div><h3>Scrub</h3><p>Scroll-linked progress.</p></div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'rangeGuide') {
+                return `
+                    <div class="root-dashboard">
+                        <div class="range-meter">
+                            <div class="range-meter__text">
+                                <span>${meta.label}</span>
+                            </div>
+                            <div class="range-track">
+                                <span class="range-fill" style="--range-left:${meta.left};--range-width:${meta.width};--range-color:${meta.color};"></span>
+                            </div>
+                            <div class="range-markers">
+                                <span>entry</span>
+                                <span>cover</span>
+                                <span>contain</span>
+                                <span>exit</span>
+                                <span>done</span>
+                            </div>
+                        </div>
+                        <div class="demo-card ${classes}">
+                            <span class="demo-token demo-token--${color}">${mark}</span>
+                            <div><h3>${title}</h3><p>${note}</p></div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'multiGrid') {
+                const parts = classes.split('||').map((value) => value.trim());
+                const labels = meta.labels || parts.map((_, i) => `case ${i + 1}`);
+                return `
+                    <div class="multi-grid">
+                        ${parts.map((part, i) => `
+                            <div class="mini-card ${part}">
+                                <span class="demo-token demo-token--${['blue', 'green', 'pink', 'gold'][i % 4]}">${labels[i] || i + 1}</span>
+                                <div><h3>${labels[i] || title}</h3><p>${note}</p></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            if (type === 'stepTimeline') {
+                const [groupClasses, ...childClasses] = classes.split('||').map((value) => value.trim());
+                const labels = meta.labels || ['1', '2', '3', '4'];
+                const tokenLabels = meta.tokens || childClasses.map((_, i) => i + 1);
+                const columns = meta.columns || Math.min(childClasses.length || 4, 4);
+                const layoutClass = meta.layout ? ` step-board--${meta.layout}` : '';
+                return `
+                    <div class="step-board${layoutClass} ${groupClasses}" style="--step-columns:${columns};">
+                        <p class="step-note">${note}</p>
+                        <div class="step-row">
+                            ${childClasses.map((part, i) => `
+                                <div class="mini-card ${part}">
+                                    <span class="demo-token demo-token--${['blue', 'green', 'pink', 'gold'][i % 4]}">${tokenLabels[i] || i + 1}</span>
+                                    <h3>${labels[i] || `Step ${i + 1}`}</h3>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'stepScrollbox') {
+                const [groupClasses, ...childClasses] = classes.split('||').map((value) => value.trim());
+                const labels = meta.labels || ['1', '2', '3', '4'];
+                const tokenLabels = meta.tokens || childClasses.map((_, i) => i + 1);
+                return `
+                    <div class="step-scrollbox ${groupClasses}" tabindex="0" data-local-scroll>
+                        <div class="step-scrollcontent">
+                            <div class="scrollbox-label">Local step scrubber: this scrollbox owns the timeline</div>
+                            <div class="step-scroll-pin">
+                                <div class="local-meter">
+                                    <span>scrollbox progress</span>
+                                    <b data-local-progress>0%</b>
+                                </div>
+                                <p class="local-note">${note}</p>
+                                <div class="step-row step-row--local">
+                                    ${childClasses.map((part, i) => `
+                                        <div class="mini-card ${part}">
+                                            <span class="demo-token demo-token--${['blue', 'green', 'pink', 'gold', 'teal'][i % 5]}">${tokenLabels[i] || i + 1}</span>
+                                            <h3>${labels[i] || `Step ${i + 1}`}</h3>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div class="scroll-ruler">scrollbox middle</div>
+                            <div class="scroll-ruler">scrollbox end</div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'timingScrollbox') {
+                const parts = classes.split('||').map((value) => value.trim());
+                const labels = meta.labels || parts.map((_, i) => `case ${i + 1}`);
+                return `
+                    <div class="timing-scrollbox" tabindex="0" data-local-scroll>
+                        <div class="timing-scrollcontent">
+                            <div class="scrollbox-label">Local timing scrubber: scroll this panel</div>
+                            <div class="timing-scroll-pin">
+                                <div class="local-meter">
+                                    <span>scrollbox progress</span>
+                                    <b data-local-progress>0%</b>
+                                </div>
+                                <p class="local-note">${note}</p>
+                                <div class="timing-row">
+                                    ${parts.map((part, i) => `
+                                        <div class="mini-card ${part}">
+                                            <span class="demo-token demo-token--${['blue', 'green', 'pink', 'gold'][i % 4]}">${labels[i] || i + 1}</span>
+                                            <h3>${labels[i] || title}</h3>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div class="scroll-ruler">scrollbox middle</div>
+                            <div class="scroll-ruler">scrollbox end</div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'variantGrid') {
+                const parts = classes.split('||').map((value) => value.trim());
+                return `
+                    <div class="variant-shell">
+                        <div class="variant-target group">
+                            <div class="multi-grid">
+                                <div class="mini-card ${parts[0]}">
+                                    <span class="demo-token demo-token--blue">${mark}</span>
+                                    <h3>Hover group</h3>
+                                </div>
+                                <button type="button" class="mini-card ${parts[1]}">
+                                    <span class="demo-token demo-token--green">F</span>
+                                    <h3>Focus button</h3>
+                                </button>
+                            </div>
+                        </div>
+                        <input class="variant-peer peer" id="timeline-peer-${index}" type="checkbox">
+                        <label class="variant-label" for="timeline-peer-${index}">Toggle peer variant</label>
+                        <div class="mini-card ${parts[2]}">
+                            <span class="demo-token demo-token--pink">P</span>
+                            <h3>Peer checked</h3>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'waitGroup') {
+                return `
+                    <div class="wait-lab" data-unwait-demo>
+                        <div class="demo-card wait motion-group" data-wait-target>
+                            <div class="mini-row">
+                                <span class="demo-token demo-token--${color} step-1:motion-preset-slide-up">1</span>
+                                <span class="demo-token demo-token--green step-2:motion-preset-pop">2</span>
+                                <span class="demo-token demo-token--gold step-3:motion-preset-slide-down">3</span>
+                            </div>
+                            <div><h3>${title}</h3><p>${note}</p></div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'waitCard') {
+                return `
+                    <div class="wait-lab" data-unwait-demo>
+                        <div class="demo-card ${classes}" data-wait-target>
+                            <span class="demo-token demo-token--${color}">${mark}</span>
+                            <div><h3>${title}</h3><p>${note}</p></div>
+                            <div class="mini-row">
+                                <span class="pill">wait starts paused</span>
+                                <span class="pill">observer removes wait</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'strip') {
+                return `
+                    <div class="scroll-strip">
+                        <div class="scroll-piece ${classes}">A</div>
+                        <div class="scroll-piece ${classes}">B</div>
+                        <div class="scroll-piece ${classes}">C</div>
+                        <div class="scroll-piece ${classes}">D</div>
+                    </div>
+                `;
+            }
+            if (type === 'rootWindow') {
+                return `
+                    <div class="root-dashboard" data-root-demo>
+                        <div class="root-meter">
+                            <div class="root-meter__text">
+                                <span>page <b data-root-percent>0%</b></span>
+                                <span>case <b data-root-active>0%</b></span>
+                                <span data-root-range>range pending</span>
+                            </div>
+                            <div class="root-meter__track">
+                                <span class="root-meter__fill"></span>
+                            </div>
+                        </div>
+                        <div class="root-samples">
+                            <div class="scroll-piece ${classes}" data-root-watch>A</div>
+                            <div class="scroll-piece ${classes}">B</div>
+                            <div class="scroll-piece ${classes}">C</div>
+                            <div class="scroll-piece ${classes}">D</div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'rootScrubLab') {
+                const parts = classes.split('||').map((value) => value.trim());
+                const labels = meta.labels || parts.map((_, i) => `root ${i + 1}`);
+                return `
+                    <div class="root-scroll-lab" data-root-demo>
+                        <div class="root-scroll-panel">
+                            <div class="root-meter">
+                                <div class="root-meter__text">
+                                    <span>page <b data-root-percent>0%</b></span>
+                                    <span>all tiles read the same root clock</span>
+                                </div>
+                                <div class="root-meter__track">
+                                    <span class="root-meter__fill"></span>
+                                </div>
+                            </div>
+                            <p class="root-scroll-note">${note}</p>
+                            <div class="root-lane-grid">
+                                ${parts.map((part, i) => `
+                                    <div class="root-lane">
+                                        <div class="scroll-piece ${part}" data-root-watch>
+                                            <span>${mark}${i + 1}</span>
+                                            <span class="progress-chip" data-root-chip>0%</span>
+                                        </div>
+                                        <div class="root-lane-label">${labels[i] || `root ${i + 1}`}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'nearestScroller') {
+                return `
+                    <div class="nearest-scrollbox" tabindex="0">
+                        <div class="nearest-scrollcontent">
+                            <div class="scrollbox-label">Scrollable panel: this box owns the timeline</div>
+                            <div class="scroll-cluster">
+                                <div class="scroll-piece ${classes}">${mark}A</div>
+                                <div class="scroll-piece ${classes}">${mark}B</div>
+                            </div>
+                            <div><h3>${title}</h3><p>${note}</p></div>
+                            <div class="mini-row">
+                                <span class="pill">scroll this panel</span>
+                                <span class="pill">scroll(nearest)</span>
+                            </div>
+                            <div class="scroll-band">
+                                <div class="scroll-cluster">
+                                    <div class="scroll-piece ${classes}">${mark}C</div>
+                                    <div class="scroll-piece ${classes}">${mark}D</div>
+                                </div>
+                            </div>
+                            <div class="scroll-ruler">middle of scrollable content</div>
+                            <div class="scroll-cluster">
+                                <div class="scroll-piece ${classes}">${mark}E</div>
+                                <div class="scroll-piece ${classes}">${mark}F</div>
+                            </div>
+                            <div class="scroll-ruler">nearest timeline end</div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (type === 'selfScroller') {
+                return `
+                    <div class="self-scrollbox ${classes}" tabindex="0">
+                        <div class="self-scrollcontent">
+                            <div class="scrollbox-label">Scrollable panel: the panel animates itself</div>
+                            <div class="scroll-cluster">
+                                <span class="demo-token demo-token--${color}">${mark}A</span>
+                                <span class="demo-token demo-token--green">${mark}B</span>
+                            </div>
+                            <div><h3>${title}</h3><p>${note}</p></div>
+                            <div class="mini-row">
+                                <span class="pill">scroll this panel</span>
+                                <span class="pill">scroll(self)</span>
+                            </div>
+                            <div class="scroll-band">
+                                <div class="scroll-cluster">
+                                    <span class="demo-token demo-token--pink">${mark}C</span>
+                                    <span class="demo-token demo-token--gold">${mark}D</span>
+                                </div>
+                            </div>
+                            <div class="scroll-ruler">middle of scrollable content</div>
+                            <div class="scroll-cluster">
+                                <span class="demo-token demo-token--red">${mark}E</span>
+                                <span class="demo-token demo-token--teal">${mark}F</span>
+                            </div>
+                            <div class="scroll-ruler">self timeline end</div>
+                        </div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="demo-card ${classes}">
+                    <span class="demo-token demo-token--${color}">${mark}</span>
+                    <div><h3>${title}</h3><p>${note}</p></div>
+                    <div class="mini-row">
+                        <span class="pill">case ${String(index + 1).padStart(2, '0')}</span>
+                        <span class="pill">${classes.includes('motion-scroll') ? 'scroll(root)' : 'view()'}</span>
+                    </div>
+                </div>
+            `;
+        };
+
+        const sectionsRoot = document.querySelector('#sections');
+        const jumpRoot = document.querySelector('#jump-list');
+
+        jumpRoot.innerHTML = sections
+            .map((section) => `<a href="#${section.id}">${section.label}</a>`)
+            .join('');
+
+        sectionsRoot.innerHTML = sections.map((section) => `
+            <section class="doc-section" id="${section.id}">
+                <div class="section-head">
+                    <div class="section-kicker">${section.label}</div>
+                    <h2>${section.title}</h2>
+                    <p>${section.intro}</p>
+                    ${section.id === 'wait' ? `
+                        <div class="wait-toolbar">
+                            <span data-wait-status>wait demos: armed until observed</span>
+                            <button type="button" data-action="replay-wait">Replay wait demos in view</button>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="case-stack">
+                    ${section.cases.map((item, index) => `
+                        <article class="case-row ${item[5] ? `case-row--${item[5]}` : ''}">
+                            <div class="case-copy">
+                                <h3 class="case-title">${item[0]}</h3>
+                                <p class="case-note">${item[2]}</p>
+                                <pre class="code-sample"><code>${prettyCode(item[1])}</code></pre>
+                            </div>
+                            <div class="demo-stage">
+                                ${stageMarkup(item, index)}
+                            </div>
+                        </article>
+                    `).join('')}
+                </div>
+            </section>
+            <div class="section-spacer">${section.label} cases complete</div>
+        `).join('');
+
+        const probe = document.querySelector('[data-motion-probe]');
+        const probeOutput = document.querySelector('[data-motion-probe-output]');
+
+        const updateProbe = () => {
+            if (!probe || !probeOutput) return;
+
+            const style = getComputedStyle(probe);
+            const active = probe.getAnimations()
+                .find((animation) => animation.animationName && animation.animationName !== 'none');
+            const timing = active?.effect?.getComputedTiming?.();
+            const progress = typeof timing?.progress === 'number'
+                ? `${Math.round(timing.progress * 100)}%`
+                : 'n/a';
+
+            probeOutput.innerHTML = `
+                <span>timeline: ${style.getPropertyValue('animation-timeline') || 'n/a'}</span>
+                <span>range: ${style.getPropertyValue('animation-range') || 'n/a'}</span>
+                <span>waapi: ${active?.timeline?.constructor?.name || 'n/a'} / ${progress}</span>
+            `;
+        };
+
+        let probeFrame = 0;
+        const queueProbeUpdate = () => {
+            cancelAnimationFrame(probeFrame);
+            probeFrame = requestAnimationFrame(updateProbe);
+        };
+
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+        const pct = (value) => `${Number(value).toFixed(2)}%`;
+
+        const pageProgress = () => {
+            const max = document.documentElement.scrollHeight - innerHeight;
+            return max > 0 ? clamp(scrollY / max, 0, 1) : 0;
+        };
+
+        const setRootWindowVar = (name, value, maxScroll) => {
+            const percent = maxScroll > 0 ? clamp((value / maxScroll) * 100, 0, 100) : 0;
+            document.documentElement.style.setProperty(name, pct(percent));
+        };
+
+        const calibrateRootWindows = () => {
+            const rootSection = document.querySelector('#scroll-root');
+            if (!rootSection) return;
+
+            const maxScroll = document.documentElement.scrollHeight - innerHeight;
+            const sectionTop = rootSection.getBoundingClientRect().top + scrollY;
+            setRootWindowVar('--root-window-start', sectionTop - innerHeight * 0.75, maxScroll);
+            setRootWindowVar('--root-window-end', sectionTop + innerHeight * 1.1, maxScroll);
+            setRootWindowVar('--root-window-mid-start', sectionTop + innerHeight * 0.7, maxScroll);
+            setRootWindowVar('--root-window-mid-end', sectionTop + innerHeight * 2.35, maxScroll);
+            setRootWindowVar('--root-window-late-start', sectionTop + innerHeight * 1.65, maxScroll);
+            setRootWindowVar('--root-window-late-end', sectionTop + innerHeight * 3.15, maxScroll);
+        };
+
+        const resolvedRangeLabel = (watch) => {
+            const classes = [...watch.classList];
+            const raw = classes.find((name) => name.startsWith('motion-range-')) || 'motion-range';
+            if (raw.includes('--root-window-start')) {
+                return `${getComputedStyle(document.documentElement).getPropertyValue('--root-window-start').trim()} -> ${getComputedStyle(document.documentElement).getPropertyValue('--root-window-end').trim()}`;
+            }
+            if (raw.includes('--root-window-mid-start')) {
+                return `${getComputedStyle(document.documentElement).getPropertyValue('--root-window-mid-start').trim()} -> ${getComputedStyle(document.documentElement).getPropertyValue('--root-window-mid-end').trim()}`;
+            }
+            if (raw.includes('--root-window-late-start')) {
+                return `${getComputedStyle(document.documentElement).getPropertyValue('--root-window-late-start').trim()} -> ${getComputedStyle(document.documentElement).getPropertyValue('--root-window-late-end').trim()}`;
+            }
+            return raw.replace(/^motion-range-\[?/, '').replace(/\]?$/, '').replace(/_/g, ' ');
+        };
+
+        const updateRootDemos = () => {
+            const progress = pageProgress();
+            document.documentElement.style.setProperty('--root-progress', progress);
+            document.querySelectorAll('[data-root-percent]').forEach((node) => {
+                node.textContent = `${Math.round(progress * 100)}%`;
+            });
+            document.querySelectorAll('[data-root-demo]').forEach((demo) => {
+                const watches = [...demo.querySelectorAll('[data-root-watch]')];
+                if (!watches.length) return;
+
+                watches.forEach((watch) => {
+                    const active = watch.getAnimations()
+                        .find((animation) => animation.effect?.getComputedTiming);
+                    const timing = active?.effect?.getComputedTiming?.();
+                    const chip = watch.querySelector('[data-root-chip]');
+                    if (chip) {
+                        chip.textContent = typeof timing?.progress === 'number'
+                            ? `${Math.round(timing.progress * 100)}%`
+                            : 'n/a';
+                    }
+                });
+
+                const watch = watches[0];
+                const active = watch.getAnimations()
+                    .find((animation) => animation.effect?.getComputedTiming);
+                const timing = active?.effect?.getComputedTiming?.();
+                const activeProgress = typeof timing?.progress === 'number'
+                    ? `${Math.round(timing.progress * 100)}%`
+                    : 'n/a';
+                const activeNode = demo.querySelector('[data-root-active]');
+                const rangeNode = demo.querySelector('[data-root-range]');
+                if (activeNode) activeNode.textContent = activeProgress;
+                if (rangeNode) rangeNode.textContent = resolvedRangeLabel(watch);
+            });
+        };
+
+        let rootFrame = 0;
+        const queueRootUpdate = () => {
+            cancelAnimationFrame(rootFrame);
+            rootFrame = requestAnimationFrame(updateRootDemos);
+        };
+
+        calibrateRootWindows();
+        updateRootDemos();
+
+        updateProbe();
+        addEventListener('scroll', queueProbeUpdate, { passive: true });
+        addEventListener('scroll', queueRootUpdate, { passive: true });
+        addEventListener(['re', 'size'].join(''), queueProbeUpdate);
+        addEventListener(['re', 'size'].join(''), () => {
+            calibrateRootWindows();
+            updateRootDemos();
+        });
+
+        const localScrollBoxes = [...document.querySelectorAll('[data-local-scroll]')];
+        const updateLocalScrollBox = (box) => {
+            const max = box.scrollHeight - box.clientHeight;
+            const progress = max > 0 ? clamp(box.scrollTop / max, 0, 1) : 0;
+            box.querySelectorAll('[data-local-progress]').forEach((node) => {
+                node.textContent = `${Math.round(progress * 100)}%`;
+            });
+        };
+        localScrollBoxes.forEach((box) => {
+            updateLocalScrollBox(box);
+            box.addEventListener('scroll', () => updateLocalScrollBox(box), { passive: true });
+        });
+
+        const waitStatus = document.querySelector('[data-wait-status]');
+        const waitTargetsFor = (element) => {
+            if (element.matches('[data-wait-target]')) return [element];
+            const targets = [...element.querySelectorAll('[data-wait-target]')];
+            return targets.length ? targets : [element];
+        };
+
+        const updateWaitStatus = () => {
+            if (!waitStatus) return;
+            const targets = [...document.querySelectorAll('[data-wait-target]')];
+            const waiting = targets.filter((element) => element.classList.contains('wait')).length;
+            const total = targets.length;
+            waitStatus.textContent = `wait demos: ${waiting} paused / ${total} total`;
+        };
+
+        const releaseWaitDemo = (element) => {
+            waitTargetsFor(element).forEach((target) => {
+                target.classList.remove('wait');
+                target.dataset.waitState = 'played';
+            });
+            element.dataset.waitState = 'played';
+            updateWaitStatus();
+        };
+
+        const observer = new IntersectionObserver((entries, io) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                releaseWaitDemo(entry.target);
+                io.unobserve(entry.target);
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('[data-unwait-demo]').forEach((element) => {
+            observer.observe(element);
+        });
+
+        const replayWaitDemosInView = () => {
+            document.querySelectorAll('[data-unwait-demo]').forEach((element) => {
+                const rect = element.getBoundingClientRect();
+                const inView = rect.bottom > 0 && rect.top < innerHeight;
+                if (!inView) return;
+
+                const targets = waitTargetsFor(element);
+                targets.forEach((target) => {
+                    target.classList.add('wait');
+                    target.dataset.waitState = 'rearmed';
+                });
+                targets.forEach((target) => {
+                    target.getAnimations({ subtree: true }).forEach((animation) => animation.cancel());
+                });
+                void element.offsetWidth;
+                requestAnimationFrame(() => releaseWaitDemo(element));
+            });
+            updateWaitStatus();
+        };
+
+        document.querySelectorAll('[data-action="replay-wait"]').forEach((button) => {
+            button.addEventListener('click', replayWaitDemosInView);
+        });
+        updateWaitStatus();
+    </script>
+</body>
+</html>

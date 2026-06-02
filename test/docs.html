@@ -531,6 +531,7 @@
         .code-class--state { color: #b91c1c; }
         .code-class--utility { color: #0f766e; }
         .code-class--loop { color: #c2410c; }
+        .code-class--timeline { color: #0369a1; }
 
         .option-table {
             display: grid;
@@ -620,6 +621,7 @@
         <a href="modifiers.html">Modifiers</a>
         <a href="nested.html">Nested</a>
         <a href="step-loops.html">Step Loops</a>
+        <a href="scroll-timelines.html">Scroll Timelines</a>
         <a href="docs.html" aria-current="page">Docs</a>
         <span class="spacer"></span>
     </nav>
@@ -668,7 +670,8 @@
                 'This page documents the current UnoCSS preset implementation, including local additions beyond the original Tailwind plugin.',
                 'Arbitrary bracket values use the syntax [value] and cannot contain whitespace or angle brackets.',
                 'Bare numeric values are first-class for time modifiers such as motion-duration-2000 and motion-delay-250; most preset size slots should use named tiers or bracket values.',
-                'The autocomplete list includes motion-preset-blur, but the active rule requires a direction such as motion-preset-blur-up.'
+                'The autocomplete list includes motion-preset-blur, but the active rule requires a direction such as motion-preset-blur-up.',
+                'scrub is the public scroll-driven view timeline utility. motion-view remains as a compatibility alias but is not the recommended name.'
             ],
             sections: [
                 {
@@ -1471,6 +1474,233 @@
                     ]
                 },
                 {
+                    id: 'scroll-driven',
+                    title: 'Scroll-Driven Motion',
+                    summary: 'CSS scroll-driven timelines for scrubbed motion. scrub maps viewport progress to animation progress; wait remains the JS one-shot trigger.',
+                    groups: [
+                        {
+                            title: 'scrub',
+                            kind: 'timeline',
+                            summary: 'Element-owned CSS view timeline. The element animates as it enters, covers, contains, or exits the viewport range.',
+                            patterns: [
+                                'scrub motion-preset-slide-up-lg',
+                                'scrub motion-preset-pop motion-range-sm',
+                                'scrub motion-preset-focus-lg motion-delay-300',
+                                'scrub motion-translate-y-in-100 motion-opacity-in',
+                                'scrub motion-scale-in-75 motion-rotate-in-45 motion-range-lg',
+                                'scrub motion-preset-pulse motion-loop-once',
+                                '<div class="scrub motion-preset-slide-up-lg">Viewport scrub</div>',
+                                '<div class="scrub motion-preset-pop motion-range-[entry_15%_cover_55%]">Custom range</div>'
+                            ],
+                            options: [
+                                ['clock', 'CSS animation-timeline: view() on the element'],
+                                ['default range', 'entry 5% contain 50%'],
+                                ['fill mode', 'animation-fill-mode: both'],
+                                ['loop count', 'Defaults --motion-loop-count to 1 so loop presets scrub as one cycle unless overridden'],
+                                ['behavior', 'Reversible. Scrolling backward reverses animation progress.'],
+                                ['preferred name', 'Use scrub. motion-view emits the same rule as a compatibility alias.']
+                            ],
+                            effects: [
+                                'Use scrub for scroll-linked progress that should visibly follow the viewport.',
+                                'Duration and delay still shape the animation internally, but the scroll timeline controls overall progress instead of wall-clock time.',
+                                'Presets, base utilities, channel modifiers, variants, and step children can all compose with scrub.',
+                                'Use wait when the desired behavior is a normal animation that starts once and then stays finished.'
+                            ],
+                            notes: [
+                                'Plain scrub is the most common scroll-driven reveal class.',
+                                'If the effect feels too early or too late, tune the motion-range utilities before reaching for custom JS.'
+                            ]
+                        },
+                        {
+                            title: 'scrub-group',
+                            kind: 'timeline',
+                            summary: 'Group-owned CSS view timeline for descendant step animations. This is the clean model for scroll-scrubbed step sequences.',
+                            patterns: [
+                                'motion-group scrub-group',
+                                'motion-group scrub-group motion-range',
+                                'motion-group scrub-group motion-range-sm',
+                                'motion-group scrub-group motion-range-contain',
+                                'motion-group scrub-group motion-range-[entry_10%_cover_70%]',
+                                '<div class="motion-group scrub-group"><div class="step-1:motion-preset-slide-up"></div><div class="step-2:motion-preset-pop"></div></div>',
+                                '<section class="motion-group scrub-group motion-range-lg"><h2 class="step-1:motion-preset-slide-up-lg"></h2><p class="step-2:motion-preset-fade"></p><button class="step-3:motion-preset-pop"></button></section>'
+                            ],
+                            options: [
+                                ['owner', 'The motion-group gets view-timeline-name: --motion-group-view'],
+                                ['targets', 'Descendants with step-1: through step-50: or .motion-timeline-target use the named timeline'],
+                                ['range inheritance', 'Put a motion-range utility on the group for the easiest mental model'],
+                                ['step timing', 'step-N:, motion-duration-*, motion-delay-*, motion-gap-*, and motion-overlap-* still define relative positions inside the group timeline'],
+                                ['loop count', 'Children inherit the group loop count, defaulting to one scrubbed cycle'],
+                                ['preferred name', 'Use scrub-group. motion-view-group emits the same compatibility rule.']
+                            ],
+                            effects: [
+                                'All step children share one viewport progress clock instead of each child owning a separate trigger range.',
+                                'This prevents the annoying pattern where every step needs to reach the same viewport position independently.',
+                                'The common authoring shape is motion-group scrub-group on the wrapper, then simple step-N: presets on children.'
+                            ],
+                            notes: [
+                                'For grouped steps, put motion-range on the group unless a child intentionally needs its own timeline.',
+                                'scrub-group does not make the group a scroller. It uses the group element as a view-timeline subject.'
+                            ]
+                        },
+                        {
+                            title: 'motion-range',
+                            kind: 'timeline',
+                            summary: 'Maps timeline phases to animation progress. This is the main tuning knob for scrub and scroll timelines.',
+                            patterns: [
+                                'motion-range',
+                                'motion-range-xs',
+                                'motion-range-sm',
+                                'motion-range-md',
+                                'motion-range-lg',
+                                'motion-range-full',
+                                'motion-range-entry',
+                                'motion-range-cover',
+                                'motion-range-contain',
+                                'motion-range-exit',
+                                'motion-range-[entry_20%_cover_60%]',
+                                'scrub motion-preset-slide-up-lg motion-range-sm',
+                                'motion-group scrub-group motion-range-contain'
+                            ],
+                            options: [
+                                ['DEFAULT / md', 'entry 5% contain 50%'],
+                                ['xs', 'entry 0% entry 100%'],
+                                ['sm', 'entry 0% cover 25%'],
+                                ['lg', 'entry 0% cover 60%'],
+                                ['full', 'entry 0% exit 100%'],
+                                ['entry', 'entry 0% entry 100%'],
+                                ['cover', 'cover 0% cover 100%'],
+                                ['contain', 'contain 0% contain 100%'],
+                                ['exit', 'exit 0% exit 100%'],
+                                ['arbitrary', 'Bracket values decode underscores to spaces, for example [entry_15%_cover_60%]']
+                            ],
+                            effects: [
+                                'entry means the subject is entering the scrollport.',
+                                'cover means the subject is crossing the scrollport from first edge contact to last edge contact.',
+                                'contain means the subject is fully inside the scrollport; tall subjects may have little or no contain phase.',
+                                'exit means the subject is leaving the scrollport.',
+                                'The default intentionally starts a little after first contact and finishes around the centered/contained portion instead of waiting until the element is gone.'
+                            ],
+                            notes: [
+                                'If a demo feels like it fires too soon, try motion-range-lg or a custom entry_15% range.',
+                                'If a demo feels stretched over too much scroll distance, try motion-range-sm or the entry range preset.'
+                            ]
+                        },
+                        {
+                            title: 'scrub-axis and scrub-inset',
+                            kind: 'timeline',
+                            summary: 'Advanced view timeline controls for non-standard axes or adjusted scrollport edges.',
+                            patterns: [
+                                'scrub scrub-axis-block',
+                                'scrub scrub-axis-inline',
+                                'scrub scrub-axis-x',
+                                'scrub scrub-axis-y',
+                                'scrub scrub-inset',
+                                'scrub scrub-inset-[20%]',
+                                'scrub scrub-inset-[10%_25%]',
+                                'scrub scrub-axis-y scrub-inset-[15%] motion-range-contain',
+                                'scrub motion-preset-slide-right-lg scrub-axis-inline'
+                            ],
+                            options: [
+                                ['axis values', 'block, inline, x, y'],
+                                ['axis default', 'block'],
+                                ['inset default', 'auto'],
+                                ['inset arbitrary', 'Single or two-value CSS inset values inside brackets'],
+                                ['aliases', 'motion-view-axis-* and motion-view-inset-* still work as compatibility aliases']
+                            ],
+                            effects: [
+                                'Vertical pages should usually use plain scrub and leave axis/inset alone.',
+                                'Insets shift the effective scrollport used by entry, cover, contain, and exit phases.',
+                                'Axis changes are useful for horizontal scrollers or explicit x/y timeline tests.'
+                            ],
+                            notes: [
+                                'Use axis/inset to solve a specific layout problem; motion-range is usually the first tuning knob.'
+                            ]
+                        },
+                        {
+                            title: 'motion-scroll',
+                            kind: 'timeline',
+                            summary: 'CSS scroll() timeline driven by a scroller instead of by the target element entering the viewport.',
+                            patterns: [
+                                'motion-scroll motion-preset-spin',
+                                'motion-scroll motion-range-[0%_100%] motion-preset-spin',
+                                'motion-scroll motion-scroll-root motion-rotate-out-180 motion-range-[0%_100%]',
+                                'motion-scroll motion-scroll-nearest motion-scale-out-150 motion-range-[0%_100%]',
+                                'motion-scroll motion-scroll-self motion-bg-out-slate-900 motion-text-out-white',
+                                'motion-scroll motion-scroll-axis-y motion-preset-pulse motion-loop-once'
+                            ],
+                            options: [
+                                ['default scroller', 'root'],
+                                ['scroller values', 'root, nearest, self'],
+                                ['axis values', 'block, inline, x, y'],
+                                ['default range', '0% 100%'],
+                                ['loop count', 'Defaults --motion-loop-count to 1 unless motion-loop-* overrides it']
+                            ],
+                            effects: [
+                                'Uses animation-timeline: scroll(...) rather than view().',
+                                'Root scroll is one global document clock. Every root-scroll animation samples the same page progress, so it can feel confusing in long documents.',
+                                'nearest and self are clearer when the demo has an obvious scroll container.',
+                                'For ordinary reveal-on-scroll cards, scrub is usually easier to reason about than motion-scroll.'
+                            ],
+                            notes: [
+                                'motion-scroll is powerful, but it is a document or container progress tool, not a replacement for wait.',
+                                'Use explicit motion-range-[0%_100%] when teaching root scroll so the global clock is visible.'
+                            ]
+                        },
+                        {
+                            title: 'motion-scroll-group',
+                            kind: 'timeline',
+                            summary: 'Named scroll timeline owned by a scroll container and shared by descendant step animations.',
+                            patterns: [
+                                'motion-group motion-scroll-group',
+                                'motion-group motion-scroll-group motion-range-[0%_100%]',
+                                'motion-group motion-scroll-group motion-scroll-axis-y',
+                                '<div class="motion-group motion-scroll-group"><div class="step-1:motion-preset-slide-up"></div><div class="step-2:motion-preset-pop"></div></div>',
+                                '<div class="motion-group motion-scroll-group motion-range-[10%_90%]"><div class="step-1:motion-preset-fade"></div><div class="step-2:motion-preset-slide-right-lg"></div><div class="step-3:motion-preset-expand"></div></div>'
+                            ],
+                            options: [
+                                ['timeline name', '--motion-group-scroll'],
+                                ['targets', 'Descendant step classes and .motion-timeline-target'],
+                                ['range default', '0% 100%'],
+                                ['axis default', 'block'],
+                                ['owner', 'The group element receives scroll-timeline-name and scroll-timeline-axis']
+                            ],
+                            effects: [
+                                'Use this when a real scroll container should drive a sequence.',
+                                'It is best demonstrated with multiple children inside a visibly scrollable panel.',
+                                'For viewport-based grouped reveals, use scrub-group instead.'
+                            ]
+                        },
+                        {
+                            title: 'Wait vs Scrub',
+                            kind: 'timeline',
+                            summary: 'The library intentionally keeps one-shot time animation and reversible scroll progress as separate APIs.',
+                            patterns: [
+                                'wait motion-preset-slide-up-lg',
+                                'scrub motion-preset-slide-up-lg',
+                                'wait motion-group step-1:motion-preset-slide-up step-2:motion-preset-pop',
+                                'motion-group scrub-group step-1:motion-preset-slide-up step-2:motion-preset-pop',
+                                '<div class="wait motion-preset-pop">JS removes wait once</div>',
+                                '<div class="scrub motion-preset-pop">CSS scrubs with scroll</div>'
+                            ],
+                            options: [
+                                ['wait', 'JS removes the wait class when the animation should start; the animation then plays normally by time'],
+                                ['scrub', 'CSS view timeline maps scroll progress to animation progress and reverses on backscroll'],
+                                ['motion-scroll', 'CSS scroll timeline maps document or container scroll progress to animation progress'],
+                                ['not included', 'No CSS wait approximation and no scroll-once mode']
+                            ],
+                            effects: [
+                                'Use wait for loading animations and one-shot viewport reveals.',
+                                'Use scrub when the user should control progress by scrolling.',
+                                'Use motion-scroll when a document or local scroll container should be the clock.',
+                                'Keeping these modes separate avoids a hidden JS branch inside the CSS timeline utilities.'
+                            ],
+                            notes: [
+                                'A one-direction scroll-once behavior needs state, so it belongs to wait or a tiny JS helper, not a pure CSS scrub utility.'
+                            ]
+                        }
+                    ]
+                },
+                {
                     id: 'sequencing',
                     title: 'Sequencing',
                     summary: 'The local step system that lets class names form a timeline.',
@@ -1768,6 +1998,12 @@
 
             if (/^step-\d+$/.test(prefixes.at(0) || '') || /^step-\d+:/.test(token)) return 'step';
             if (base === 'motion-group') return 'group';
+            if (/^(scrub|scrub-group)$/.test(base)) return 'timeline';
+            if (/^scrub-(axis|inset)(?:-|$)/.test(base)) return 'timeline';
+            if (/^(motion-view|motion-view-group)$/.test(base)) return 'timeline';
+            if (/^motion-view-(axis|inset)(?:-|$)/.test(base)) return 'timeline';
+            if (/^motion-scroll(?:-|$)/.test(base)) return 'timeline';
+            if (/^motion-range(?:-|$)/.test(base)) return 'timeline';
             if (/^(wait|still|pause|play|motion-paused|motion-running)$/.test(base)) return 'state';
             if (/^motion-repeat/.test(base)) return 'loop';
             if (/^motion-preset-/.test(base)) return /spin|blink|pulse|wobble|seesaw|oscillate|stretch|float/.test(base) ? 'loop' : 'preset';

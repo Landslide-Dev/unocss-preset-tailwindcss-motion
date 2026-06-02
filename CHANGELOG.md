@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-06-02
+
+### Added
+- CSS scroll-driven motion utilities: `scrub`, `scrub-group`, `motion-scroll`, `motion-scroll-group`, and `motion-range-*`.
+- View timeline controls with `scrub-axis-*` and `scrub-inset-*`.
+- Extensive `test/scroll-timelines.html` torture page for viewport scrub, root scroll, local scroll containers, ranges, durations, delays, loops, and scrubbed step groups.
+- Dedicated scroll-driven motion docs in `test/docs.html` and README.
+
+### Changed
+- `scrub` is now the documented public name for view-timeline motion.
+- `motion-view` utilities remain available as compatibility aliases.
+- Scroll timeline loop presets default to one scrubbed cycle unless explicitly overridden.
+
+## [4.1.0] - 2026-05-08
+
+### Added
+- New `repeat()` runtime helper (`dist/repeat.js`) for step sequencing and looping, with associated tests and demos
+- `xs` size tier for motion utilities
+- Arbitrary-value JIT support; pass any `[value]` directly to motion utilities
+- `!important` modifier controls
+
+### Changed
+- README expanded with steps and repeat helper documentation
+- Step sequencing demos added to `test/`
+
 ## [4.0.3] - 2025-10-30
 
 ### Fixed
@@ -24,4 +49,3 @@ This addresses a known Lighthouse bug where animations starting at exactly 0 can
 ## [4.0.1] - Previous Release
 
 (Add previous release notes here if available)
-

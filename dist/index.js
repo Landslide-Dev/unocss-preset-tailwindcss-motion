@@ -296,6 +296,26 @@ const resolveTimeValue = (value, theme, defaultValue = theme.animationDuration.D
     return `${value}ms`
 }
 
+const decodeArbitraryValue = (value) => String(value).replace(/_/g, ' ')
+
+const motionTimelineRange = {
+    DEFAULT: 'entry 5% contain 50%',
+    xs: 'entry 0% entry 100%',
+    sm: 'entry 0% cover 25%',
+    md: 'entry 5% contain 50%',
+    lg: 'entry 0% cover 60%',
+    full: 'entry 0% exit 100%',
+    contain: 'contain 0% contain 100%',
+    cover: 'cover 0% cover 100%',
+    entry: 'entry 0% entry 100%',
+    exit: 'exit 0% exit 100%',
+}
+
+const motionTimelineTargetSelector = `:where(${[
+    ...Array.from({ length: 50 }, (_, i) => `[class*="step-${i + 1}:"]`),
+    '.motion-timeline-target',
+].join(', ')})`
+
 const negateCSSValue = (value) => value.startsWith('-') ? value.slice(1) : `calc(${value} * -1)`
 const subtractCSSValue = (left, right) => String(right).startsWith('-')
     ? `calc(${left} + ${String(right).slice(1)})`
@@ -1545,35 +1565,6 @@ export const presetTailwindMotion = () => ({
             };
         }, { autocomplete: ['motion-ease', 'motion-ease-(linear|in|out|in-out|spring-smooth|spring-snappy|spring-bouncy|spring-bouncier|spring-bounciest|bounce)', 'motion-ease-(linear|in|out|in-out|spring-smooth|spring-snappy|spring-bouncy|spring-bouncier|spring-bounciest|bounce)/(scale|translate|rotate|blur|grayscale|opacity|background|text)'] }],
 
-        // MOTION LOOP
-        [/^motion-loop(-([^<>\s]+?))?(\/(scale|translate|rotate|blur|grayscale|opacity|background|text))?$/, ([, , value = 'DEFAULT', , modifier], { theme }) => {
-            const loopCount = value === 'DEFAULT' ? theme.animationLoopCount.DEFAULT : 
-                            value.startsWith('[') ? value.slice(1, -1) : 
-                            theme.animationLoopCount[value] || value;
-
-            if (modifier) {
-                switch (modifier) {
-                    case "scale":
-                        return { "--motion-scale-loop-count": loopCount };
-                    case "translate":
-                        return { "--motion-translate-loop-count": loopCount };
-                    case "rotate":
-                        return { "--motion-rotate-loop-count": loopCount };
-                    case "blur":
-                    case "grayscale":
-                        return { "--motion-filter-loop-count": loopCount };
-                    case "opacity":
-                        return { "--motion-opacity-loop-count": loopCount };
-                    case "background":
-                        return { "--motion-background-color-loop-count": loopCount };
-                    case "text":
-                        return { "--motion-text-color-loop-count": loopCount };
-                }
-            }
-
-            return { "--motion-loop-count": loopCount };
-        }, { autocomplete: ['motion-loop', 'motion-loop-infinite', 'motion-loop-[<num>]', 'motion-loop-<num>/(scale|translate|rotate|blur|grayscale|opacity|background|text)'] }],
-
         [/^motion-paused$/, (_, ctx) => withVariants(ctx, (sel) => `
             ${sel},
             ${sel}::before,
@@ -2123,6 +2114,125 @@ export const presetTailwindMotion = () => ({
         ['motion-group', {
             '--motion-scope': '1',
         }, { autocomplete: 'motion-group' }],
+
+        // Scroll-driven motion. These intentionally set timeline/range after
+        // preset animation shorthands, because `animation` resets timelines.
+        [/^(?:motion-view|scrub)$/, () => ({
+            '--motion-view-axis': 'block',
+            '--motion-view-inset': 'auto',
+            '--motion-timeline-range': motionTimelineRange.DEFAULT,
+            '--motion-loop-count': '1',
+            'animation-timeline': 'view()',
+            'animation-range': 'var(--motion-timeline-range)',
+            'animation-fill-mode': 'both',
+        }), { autocomplete: ['scrub', 'motion-view'] }],
+
+        [/^(?:motion-view-group|scrub-group)$/, (_, ctx) => withVariants(ctx, (sel) => `
+            ${sel} {
+                --motion-view-axis: block;
+                --motion-view-inset: auto;
+                --motion-timeline-range: ${motionTimelineRange.DEFAULT};
+                --motion-loop-count: 1;
+                view-timeline-name: --motion-group-view;
+                view-timeline-axis: var(--motion-view-axis);
+                view-timeline-inset: var(--motion-view-inset);
+            }
+            ${sel} ${motionTimelineTargetSelector} {
+                --motion-loop-count: inherit;
+                animation-timeline: --motion-group-view;
+                animation-range: var(--motion-timeline-range);
+                animation-fill-mode: both;
+            }
+        `), { autocomplete: ['scrub-group', 'motion-view-group'] }],
+
+        [/^(?:motion-view-axis|scrub-axis)-(block|inline|x|y)$/, ([, axis]) => ({
+            '--motion-view-axis': axis,
+            'view-timeline-axis': 'var(--motion-view-axis)',
+            'animation-timeline': `view(${axis})`,
+        }), { autocomplete: ['scrub-axis-(block|inline|x|y)', 'motion-view-axis-(block|inline|x|y)'] }],
+
+        [/^(?:motion-view-inset|scrub-inset)(?:-([^<>\s]+?))?$/, ([, value = 'auto']) => ({
+            '--motion-view-inset': value.startsWith('[') ? decodeArbitraryValue(value.slice(1, -1)) : value,
+            'view-timeline-inset': 'var(--motion-view-inset)',
+            'animation-timeline': value === 'auto'
+                ? 'view()'
+                : `view(var(--motion-view-axis, block) var(--motion-view-inset))`,
+        }), { autocomplete: ['scrub-inset', 'scrub-inset-[<value>]', 'motion-view-inset', 'motion-view-inset-[<value>]'] }],
+
+        ['motion-scroll', {
+            '--motion-scroll-scroller': 'root',
+            '--motion-scroll-axis': 'block',
+            '--motion-timeline-range': '0% 100%',
+            '--motion-loop-count': '1',
+            'animation-timeline': 'scroll(root)',
+            'animation-range': 'var(--motion-timeline-range)',
+            'animation-fill-mode': 'both',
+        }, { autocomplete: 'motion-scroll' }],
+
+        [/^motion-scroll-group$/, (_, ctx) => withVariants(ctx, (sel) => `
+            ${sel} {
+                --motion-scroll-axis: block;
+                --motion-timeline-range: 0% 100%;
+                --motion-loop-count: 1;
+                scroll-timeline-name: --motion-group-scroll;
+                scroll-timeline-axis: var(--motion-scroll-axis);
+            }
+            ${sel} ${motionTimelineTargetSelector} {
+                --motion-loop-count: inherit;
+                animation-timeline: --motion-group-scroll;
+                animation-range: var(--motion-timeline-range);
+                animation-fill-mode: both;
+            }
+        `), { autocomplete: 'motion-scroll-group' }],
+
+        [/^motion-scroll-(root|nearest|self)$/, ([, scroller]) => ({
+            '--motion-scroll-scroller': scroller,
+            'animation-timeline': `scroll(${scroller})`,
+        }), { autocomplete: ['motion-scroll-(root|nearest|self)'] }],
+
+        [/^motion-scroll-axis-(block|inline|x|y)$/, ([, axis]) => ({
+            '--motion-scroll-axis': axis,
+            'scroll-timeline-axis': 'var(--motion-scroll-axis)',
+            'animation-timeline': `scroll(var(--motion-scroll-scroller, root) ${axis})`,
+        }), { autocomplete: ['motion-scroll-axis-(block|inline|x|y)'] }],
+
+        [/^motion-range(?:-([^<>\s]+?))?$/, ([, value = 'DEFAULT']) => ({
+            '--motion-timeline-range': value.startsWith('[')
+                ? decodeArbitraryValue(value.slice(1, -1))
+                : (motionTimelineRange[value] || decodeArbitraryValue(value)),
+            'animation-range': 'var(--motion-timeline-range)',
+            'animation-fill-mode': 'both',
+        }), { autocomplete: ['motion-range', 'motion-range-(xs|sm|md|lg|full|entry|cover|contain|exit)', 'motion-range-[<value>]'] }],
+
+        // Keep this after scroll-driven timeline rules. Scroll/view timelines
+        // default loops to one scrubbed cycle, but explicit loop utilities win.
+        [/^motion-loop(-([^<>\s]+?))?(\/(scale|translate|rotate|blur|grayscale|opacity|background|text))?$/, ([, , value = 'DEFAULT', , modifier], { theme }) => {
+            const loopCount = value === 'DEFAULT' ? theme.animationLoopCount.DEFAULT :
+                            value.startsWith('[') ? value.slice(1, -1) :
+                            theme.animationLoopCount[value] || value;
+
+            if (modifier) {
+                switch (modifier) {
+                    case "scale":
+                        return { "--motion-scale-loop-count": loopCount };
+                    case "translate":
+                        return { "--motion-translate-loop-count": loopCount };
+                    case "rotate":
+                        return { "--motion-rotate-loop-count": loopCount };
+                    case "blur":
+                    case "grayscale":
+                        return { "--motion-filter-loop-count": loopCount };
+                    case "opacity":
+                        return { "--motion-opacity-loop-count": loopCount };
+                    case "background":
+                        return { "--motion-background-color-loop-count": loopCount };
+                    case "text":
+                        return { "--motion-text-color-loop-count": loopCount };
+                }
+            }
+
+            return { "--motion-loop-count": loopCount };
+        }, { autocomplete: ['motion-loop', 'motion-loop-infinite', 'motion-loop-[<num>]', 'motion-loop-<num>/(scale|translate|rotate|blur|grayscale|opacity|background|text)'] }],
 
         ['motion-repeat', {
             '--motion-repeat': '1',

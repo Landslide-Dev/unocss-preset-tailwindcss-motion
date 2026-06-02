@@ -30,6 +30,7 @@ The base API tracks `v4` of the Tailwind plugin, then adds a few UnoCSS/Magic Fi
 
 - Sequential steps with the `step-N:` variant. Example: `step-1:motion-preset-slide-up step-2:motion-preset-pop`.
 - Grouped step timelines with `motion-group`. Groups read timing from any matching descendant, no matter how deeply nested.
+- CSS scroll-driven motion with `scrub`, `scrub-group`, `motion-scroll`, and motion range utilities. Use this when scroll progress should drive animation progress with no custom JavaScript.
 - Same-element translate, rotate, and scale paths. Repeated `step-N:motion-preset-slide-up-lg` stacks upward, and repeated `step-N:motion-preset-expand` keeps growing instead of restarting from zero.
 - Step timing offsets with `motion-gap-*` and `motion-overlap-*` for starting the next step later or earlier than the previous step end.
 - Sequence repeat utilities: `motion-repeat`, `motion-repeat-delay-*`, `motion-repeat-count-*`, plus `dist/repeat.js` for replaying a completed step group.
@@ -51,6 +52,7 @@ This repo also includes local torture pages. Run `npm run build`, serve this fol
 - `test/nested.html` — nested and unnested step/group behavior.
 - `test/step-loops.html` — looping inside steps vs replaying a whole step sequence.
 - `test/step-path-torture.html` — same-element paths, skipped steps, explicit exits, display-ad style timelines, and `wait` sanity checks.
+- `test/scroll-timelines.html` — CSS view timelines, root/container scroll timelines, ranges, delays, durations, loops, and scrubbed step groups.
 
 For example:
 
@@ -127,6 +129,21 @@ Use motion-group when different descendants need to share one timeline.
 <div class="motion-group">
     <h1 class="step-1:motion-preset-slide-down-lg step-1:motion-duration-5000">Hello</h1>
     <h2 class="step-2:motion-preset-slide-up-sm">World</h2>
+</div>
+
+
+<!--
+SCROLL-DRIVEN SCRUB
+Use scrub when scroll progress should drive animation progress.
+-->
+<div class="scrub motion-preset-slide-up-lg"></div>
+<div class="scrub motion-preset-pop motion-range-sm"></div>
+<div class="scrub motion-preset-focus-lg motion-range-[entry_15%_cover_60%]"></div>
+
+<div class="motion-group scrub-group motion-range-lg">
+    <h1 class="step-1:motion-preset-slide-up-lg">Scroll step one</h1>
+    <p class="step-2:motion-preset-fade">Scroll step two</p>
+    <button class="step-3:motion-preset-pop">Scroll step three</button>
 </div>
 
 ```
@@ -295,6 +312,119 @@ import {
 ```
 
 Magic Fields injects a small guarded version of this helper automatically, but only when a rendered page contains a standalone `motion-repeat` class.
+
+## Scroll-Driven Scrub Timelines
+
+`scrub` is the public name for CSS view-timeline motion. It is for effects where scroll progress should drive animation progress. This is different from `wait`: `wait` pauses a normal animation until JavaScript removes the class, then the animation plays once by time.
+
+```html
+<!-- Normal one-shot reveal. JS removes wait when ready. -->
+<div class="wait motion-preset-slide-up-lg">Plays once</div>
+
+<!-- Scroll-linked reveal. Scroll position controls progress and can reverse it. -->
+<div class="scrub motion-preset-slide-up-lg">Scrubs with viewport progress</div>
+```
+
+The common model is:
+
+- `wait`: one-shot JS gate for loading states and viewport reveals that should stay complete.
+- `scrub`: CSS `view()` timeline on the element; reversible on backscroll.
+- `scrub-group`: CSS named view timeline on a `motion-group`; descendant `step-N:` animations share the group viewport progress.
+- `motion-scroll`: CSS `scroll()` timeline driven by the root document or a scroll container.
+
+`motion-view`, `motion-view-group`, `motion-view-axis-*`, and `motion-view-inset-*` remain compatibility aliases, but `scrub` is the recommended public name.
+
+### Element Scrub
+
+```html
+<div class="scrub motion-preset-slide-up-lg">Default range</div>
+<div class="scrub motion-preset-pop motion-range-sm">Shorter range</div>
+<div class="scrub motion-scale-in-75 motion-rotate-in-45 motion-opacity-in">Composed channels</div>
+<div class="scrub motion-preset-pulse motion-loop-once">One scrubbed loop cycle</div>
+```
+
+`scrub` emits `animation-timeline: view()`, sets `animation-range` from `--motion-timeline-range`, and defaults loop count to `1` so loop presets scrub through one cycle unless you override it.
+
+### Group Scrub With Steps
+
+Put the timeline on the group when multiple descendants should share one viewport clock.
+
+```html
+<section class="motion-group scrub-group motion-range-lg">
+    <h2 class="step-1:motion-preset-slide-up-lg">Headline</h2>
+    <p class="step-2:motion-preset-fade">Body copy</p>
+    <button class="step-3:motion-preset-pop">Action</button>
+</section>
+```
+
+The wrapper gets `view-timeline-name: --motion-group-view`. Descendants with `step-1:` through `step-50:` or `.motion-timeline-target` use that named timeline. Step timing still works the same: `step-N:motion-duration-*`, `step-N:motion-delay-*`, `step-N:motion-gap-*`, and `step-N:motion-overlap-*` shape where each step lands inside the scrubbed sequence.
+
+### Ranges
+
+Motion range utilities control which part of the view or scroll timeline maps to animation progress.
+
+```html
+<div class="scrub motion-preset-slide-up-lg motion-range">Default</div>
+<div class="scrub motion-preset-slide-up-lg motion-range-sm">Earlier and tighter</div>
+<div class="scrub motion-preset-slide-up-lg motion-range-lg">Longer travel</div>
+<div class="scrub motion-preset-slide-up-lg motion-range-full">Entry through exit</div>
+<div class="scrub motion-preset-slide-up-lg motion-range-[entry_15%_cover_60%]">Custom</div>
+```
+
+Range presets:
+
+- `motion-range` / `motion-range-md`: `entry 5% contain 50%`
+- `motion-range-xs`: `entry 0% entry 100%`
+- `motion-range-sm`: `entry 0% cover 25%`
+- `motion-range-lg`: `entry 0% cover 60%`
+- `motion-range-full`: `entry 0% exit 100%`
+- `motion-range-entry`: `entry 0% entry 100%`
+- `motion-range-cover`: `cover 0% cover 100%`
+- `motion-range-contain`: `contain 0% contain 100%`
+- `motion-range-exit`: `exit 0% exit 100%`
+- `motion-range-[entry_20%_cover_60%]`: arbitrary range value, with underscores decoded to spaces
+
+The phase names are CSS named timeline phases:
+
+- `entry`: the subject is entering the scrollport.
+- `cover`: the subject is crossing the scrollport from first edge contact to last edge contact.
+- `contain`: the subject is fully inside the scrollport. Very tall subjects may have little or no contain phase.
+- `exit`: the subject is leaving the scrollport.
+
+The default is intentionally a little later than first contact and finishes near the centered/contained portion. If a reveal feels too early, try `motion-range-lg` or a custom `motion-range-[entry_15%_cover_60%]`. If it feels too stretched out, try `motion-range-sm`, or use the entry range preset.
+
+### Axis And Inset
+
+Most vertical page cases should use plain `scrub`. Axis and inset are for horizontal scrollers, explicit x/y tests, or layouts where the effective viewport edge needs adjustment.
+
+```html
+<div class="scrub scrub-axis-y motion-preset-slide-up-lg">Y axis</div>
+<div class="scrub scrub-axis-inline motion-preset-slide-right-lg">Inline axis</div>
+<div class="scrub scrub-inset-[20%] motion-preset-pop">Inset scrollport</div>
+<div class="scrub scrub-inset-[10%_25%] motion-range-contain motion-preset-focus-lg">Two-value inset</div>
+```
+
+### Scroll Timelines
+
+Use `motion-scroll` when the root page or a local scroll container should be the animation clock. Root scroll is one global document clock, so it is powerful but can be confusing on long pages.
+
+```html
+<div class="motion-scroll motion-range-[0%_100%] motion-preset-spin">Root scroll progress</div>
+<div class="motion-scroll motion-scroll-nearest motion-range-[0%_100%] motion-scale-out-150">Nearest scroller progress</div>
+<div class="motion-scroll motion-scroll-self motion-range-[0%_100%] motion-bg-out-slate-900 motion-text-out-white">Self scroller progress</div>
+```
+
+For scroll-driven step sequences inside an actual scroll container, use `motion-scroll-group`:
+
+```html
+<div class="motion-group motion-scroll-group motion-range-[0%_100%]">
+    <div class="step-1:motion-preset-fade">First</div>
+    <div class="step-2:motion-preset-slide-right-lg">Second</div>
+    <div class="step-3:motion-preset-expand">Third</div>
+</div>
+```
+
+For ordinary card reveal-on-scroll work, start with `scrub` or `scrub-group`. Reach for `motion-scroll` when the scroll container itself is the thing you want to measure.
 
 ## Full Docs & Reference
 
@@ -639,6 +769,33 @@ motion-repeat-count-<number>
 </div>
 ```
 
+#### Scroll-Driven Timelines
+```
+scrub
+scrub-group
+scrub-axis-(block|inline|x|y)
+scrub-inset
+scrub-inset-[<value>]
+
+motion-range
+motion-range-(xs|sm|md|lg|full|entry|cover|contain|exit)
+motion-range-[<value>]
+
+motion-scroll
+motion-scroll-(root|nearest|self)
+motion-scroll-axis-(block|inline|x|y)
+motion-scroll-group
+```
+
+```html
+<div class="scrub motion-preset-slide-up-lg">Element view timeline</div>
+
+<div class="motion-group scrub-group motion-range-lg">
+    <div class="step-1:motion-preset-fade">Step one</div>
+    <div class="step-2:motion-preset-pop">Step two</div>
+</div>
+```
+
 #### Group
 ```
 motion-group
@@ -701,6 +858,15 @@ These are not part of the original library, see "What's Different" below for mor
 .motion-repeat
 .motion-repeat-delay-*
 .motion-repeat-count-*
+
+/* CSS scroll-driven timelines */
+.scrub
+.scrub-group
+.motion-range
+.motion-range-sm
+.motion-range-[entry_20%_cover_60%]
+.motion-scroll
+.motion-scroll-group
 ```
 
 
@@ -828,7 +994,7 @@ You don't need to do anything special — every UnoCSS variant from `presetUno` 
 - The folder `tailwind` is for the Tailwind comparison styles. `tailwindcss-motion-reference` is detached for file comparison and is not used by the preset.
 - To develop the UnoCSS output, run `npm run dev`.
 - To build everything, run `npm run build`.
-- For the current demo pages, serve this package folder and open `test/docs.html`, `test/individual-animations.html`, `test/variants.html`, `test/modifiers.html`, `test/nested.html`, `test/step-loops.html`, or `test/step-path-torture.html`.
+- For the current demo pages, serve this package folder and open `test/docs.html`, `test/individual-animations.html`, `test/variants.html`, `test/modifiers.html`, `test/nested.html`, `test/step-loops.html`, `test/step-path-torture.html`, or `test/scroll-timelines.html`.
 - For more, reference `package.json`.
 
 ## License
